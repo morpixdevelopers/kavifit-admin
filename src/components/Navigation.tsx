@@ -1,8 +1,10 @@
 import { Dumbbell } from "lucide-react";
 
+// FIX: Updated interface to include all possible page types
 interface NavigationProps {
-  currentPage: "add" | "view";
-  onNavigate: (page: "add" | "view") => void;
+  currentPage: "add" | "view" | "detail" | "payments";
+  onNavigate: (page: "add" | "view" | "detail" | "payments") => void;
+  memberId?: string; // Added to match the prop being passed in App.tsx
 }
 
 export function Navigation({ currentPage, onNavigate }: NavigationProps) {
@@ -28,12 +30,22 @@ export function Navigation({ currentPage, onNavigate }: NavigationProps) {
             <button
               onClick={() => onNavigate("view")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                currentPage === "view"
+                currentPage === "view" || currentPage === "detail"
                   ? "bg-orange-500 text-white"
                   : "bg-slate-700 text-slate-300 hover:bg-slate-600"
               }`}
             >
               View Members
+            </button>
+            <button
+              onClick={() => onNavigate("payments")}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                currentPage === "payments"
+                  ? "bg-orange-500 text-white"
+                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              Payment Details
             </button>
           </div>
         </div>

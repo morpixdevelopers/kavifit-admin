@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Edit, MessageCircle, CheckCircle, XCircle, X } from "lucide-react";
+import {
+  Edit,
+  MessageCircle,
+  CheckCircle,
+  XCircle,
+  X,
+  Search,
+} from "lucide-react";
 
 type FilterType = "all" | "active" | "expiring" | "expired";
 
@@ -30,6 +37,7 @@ interface ViewMembersProps {
 export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
 
   // Modal State
@@ -49,12 +57,9 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   useEffect(() => {
     if (formData.start_date && formData.no_of_months > 0) {
       const start = new Date(formData.start_date);
-      // Adding months: Date object handles overflow (e.g., Jan 31 + 1 month = March 3)
       const end = new Date(
         start.setMonth(start.getMonth() + formData.no_of_months)
       );
-
-      // Format to YYYY-MM-DD for the date input
       const formattedEndDate = end.toISOString().split("T")[0];
       setFormData((prev) => ({ ...prev, end_date: formattedEndDate }));
     }
@@ -129,20 +134,28 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   const getLatestMembership = (memberships: Membership[]) =>
     memberships.length > 0 ? memberships[memberships.length - 1] : undefined;
 
-  const getMemberStatus = (membership?: Membership): FilterType => {
-    if (!membership) return "expired";
+  const getMemberStatus = (membership?: Membership): FilterType | "none" => {
+    if (!membership) return "none"; // Special status for people with NO memberships
     const days = getDaysUntilDue(membership.end_date);
     if (days > 7) return "active";
     if (days >= 0) return "expiring";
     return "expired";
   };
 
-  const filteredMembers =
-    filter === "all"
-      ? members
-      : members.filter(
-          (m) => getMemberStatus(getLatestMembership(m.memberships)) === filter
-        );
+  // Logic:
+  // 1. Search filter first
+  // 2. Tab filter second (If 'none', only show in 'all')
+  const processedMembers = members.filter((m) => {
+    const matchesSearch =
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.member_no.toString().includes(searchQuery);
+
+    const status = getMemberStatus(getLatestMembership(m.memberships));
+
+    if (!matchesSearch) return false;
+    if (filter === "all") return true;
+    return status === filter; // status 'none' will naturally fail here, showing only in 'all'
+  });
 
   const counts = {
     all: members.length,
@@ -158,20 +171,33 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 text-white">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold">Members</h2>
-        <p className="text-gray-400">Manage gym members and subscriptions</p>
+    <div className="max-w-5xl mx-auto px-4 py-8 text-white">
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold">Members</h2>
+          <p className="text-gray-400">Manage gym members and subscriptions</p>
+        </div>
+
+        {/* SEARCH BAR */}
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search name or admission id..."
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-white focus:border-orange-500 outline-none transition-all"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-3">
         {(["all", "active", "expiring", "expired"] as FilterType[]).map((f) => {
-          // Define active colors for each specific button type
           const activeColors = {
             all: "bg-gray-400 text-black border-gray-400",
-            active: "bg-black-600 text-green-500 border-green-600",
-            expiring: "bg-black-500 text-yellow-500 border-yellow-500",
-            expired: "bg-black-600 text-red-500 border-red-600",
+            active: "bg-black text-green-500 border-green-600",
+            expiring: "bg-black text-yellow-500 border-yellow-500",
+            expired: "bg-black text-red-500 border-red-600",
           };
 
           return (
@@ -193,25 +219,29 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
       <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
         {loading ? (
           <p className="text-center text-gray-400 py-8">Loading members...</p>
-        ) : filteredMembers.length === 0 ? (
-          <p className="text-center text-gray-400 py-8">No members found.</p>
+        ) : processedMembers.length === 0 ? (
+          <p className="text-center text-gray-400 py-8">
+            No members match your criteria.
+          </p>
         ) : (
-          <div className="space-y-3 max-h-[550px] overflow-y-auto">
-            {filteredMembers.map((member) => {
+          <div className="space-y-3 max-h-[550px] overflow-y-auto pr-2">
+            {processedMembers.map((member) => {
               const latest = getLatestMembership(member.memberships);
               const daysLeft = latest ? getDaysUntilDue(latest.end_date) : null;
+              const status = getMemberStatus(latest);
 
               return (
                 <div
                   key={member.id}
                   onClick={() => onSelectMember(member.id)}
-                  className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-orange-500 cursor-pointer"
+                  className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-orange-500 cursor-pointer transition-all"
                 >
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="text-lg font-semibold">{member.name}</h4>
-                        {daysLeft !== null && daysLeft >= 0 ? (
+                        {/* ICON LOGIC: Green if active/expiring, Red if expired or NO membership */}
+                        {status === "active" || status === "expiring" ? (
                           <CheckCircle className="text-green-500 w-5 h-5" />
                         ) : (
                           <XCircle className="text-red-500 w-5 h-5" />
@@ -221,12 +251,12 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                         Admission No: {member.member_no}
                       </p>
                       <p className="text-sm text-gray-400">
-                        Package: {latest?.package ?? "N/A"}
+                        Package: {latest?.package ?? "None"}
                       </p>
                       <p className="text-sm text-gray-400">
-                        Expires:{" "}
+                        Status:{" "}
                         {daysLeft === null
-                          ? "N/A"
+                          ? "No Membership"
                           : daysLeft < 0
                           ? "Expired"
                           : `${daysLeft} days left`}
@@ -236,7 +266,8 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                     <div className="flex gap-2">
                       <button
                         onClick={(e) => handleOpenEdit(e, member)}
-                        className="p-2 text-blue-400 hover:bg-blue-900/20 rounded"
+                        className="p-2 text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
+                        title="Renew Membership"
                       >
                         <Edit className="w-5 h-5" />
                       </button>
@@ -248,7 +279,8 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                             "_blank"
                           );
                         }}
-                        className="p-2 text-green-400 hover:bg-green-900/20 rounded"
+                        className="p-2 text-green-400 hover:bg-green-900/20 rounded transition-colors"
+                        title="Contact on WhatsApp"
                       >
                         <MessageCircle className="w-5 h-5" />
                       </button>
@@ -263,7 +295,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
       {/* RENEW/EDIT MODAL */}
       {isModalOpen && selectedMemberForEdit && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-slate-800 border border-orange-500 rounded-xl max-w-md w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-orange-500">
@@ -364,7 +396,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                     type="date"
                     required
                     value={formData.start_date}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none"
                     onChange={(e) =>
                       setFormData({ ...formData, start_date: e.target.value })
                     }
@@ -379,7 +411,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                     required
                     readOnly
                     value={formData.end_date}
-                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-orange-400 cursor-default"
+                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-orange-400 cursor-default outline-none"
                   />
                 </div>
               </div>
