@@ -1,15 +1,28 @@
 import { useState, useEffect } from 'react';
-import { supabase, Member } from '../lib/supabase';
-import { Users, Edit, MessageCircle, CheckCircle, XCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Edit, MessageCircle, CheckCircle, XCircle } from 'lucide-react';
 
 type FilterType = 'all' | 'active' | 'expiring' | 'expired';
+
+interface MemberWithMembership {
+  id: string;
+  name: string;
+  contact_number: string;
+  member_no: number;
+  created_at: string;
+  memberships: {
+    package: string;
+    start_date: string;
+    end_date: string;
+  }[];
+}
 
 interface ViewMembersProps {
   onSelectMember: (memberId: string) => void;
 }
 
 export function ViewMembers({ onSelectMember }: ViewMembersProps) {
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<MemberWithMembership[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [loading, setLoading] = useState(true);
 
@@ -19,23 +32,38 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
   const fetchMembers = async () => {
     setLoading(true);
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from('members')
-      .select('*')
+      .select(`
+        id,
+        name,
+        contact_number,
+        member_no,
+        created_at,
+        memberships (
+          package,
+          start_date,
+          end_date
+        )
+      `)
       .order('created_at', { ascending: false });
 
-    setMembers(data || []);
+    if (!error && data) {
+      setMembers(data);
+    }
+
     setLoading(false);
   };
 
-  const getDaysUntilDue = (dueDate: string) => {
-    const end = new Date(dueDate);
+  const getDaysUntilDue = (endDate: string) => {
+    const end = new Date(endDate);
     const now = new Date();
     return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const getMemberStatus = (dueDate: string): FilterType => {
-    const days = getDaysUntilDue(dueDate);
+  const getMemberStatus = (endDate: string): FilterType => {
+    const days = getDaysUntilDue(endDate);
     if (days > 7) return 'active';
     if (days >= 0) return 'expiring';
     return 'expired';
@@ -44,25 +72,35 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   const filteredMembers =
     filter === 'all'
       ? members
-      : members.filter(m => getMemberStatus(m.due_date) === filter);
+      : members.filter(m => {
+          const membership = m.memberships[0];
+          if (!membership) return false;
+          return getMemberStatus(membership.end_date) === filter;
+        });
 
   const counts = {
     all: members.length,
-    active: members.filter(m => getMemberStatus(m.due_date) === 'active').length,
-    expiring: members.filter(m => getMemberStatus(m.due_date) === 'expiring').length,
-    expired: members.filter(m => getMemberStatus(m.due_date) === 'expired').length,
+    active: members.filter(
+      m => m.memberships[0] && getMemberStatus(m.memberships[0].end_date) === 'active'
+    ).length,
+    expiring: members.filter(
+      m => m.memberships[0] && getMemberStatus(m.memberships[0].end_date) === 'expiring'
+    ).length,
+    expired: members.filter(
+      m => m.memberships[0] && getMemberStatus(m.memberships[0].end_date) === 'expired'
+    ).length,
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-white">
+    <div className="max-w-7xl mx-auto px-4 py-8 text-white">
 
       {/* HEADER */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold mb-2">Members</h2>
+        <h2 className="text-3xl font-bold">Members</h2>
         <p className="text-gray-400">Manage gym members and subscriptions</p>
       </div>
 
-      {/* FILTER BUTTONS – ADMIN DESIGN */}
+      {/* FILTERS */}
       <div className="mb-6 flex flex-wrap gap-3">
         <button
           onClick={() => setFilter('all')}
@@ -109,80 +147,69 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
         </button>
       </div>
 
-      {/* MEMBER CARDS – ADMIN DESIGN */}
-      <div className="bg-gray-900 rounded-lg shadow-xl p-6 border border-gray-800">
-        <h3 className="text-xl font-semibold mb-6">Members List</h3>
-
+      {/* MEMBER LIST */}
+      <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
         {loading ? (
-          <p className="text-gray-400 text-center py-8">Loading members...</p>
+          <p className="text-center text-gray-400 py-8">Loading members...</p>
         ) : filteredMembers.length === 0 ? (
-          <p className="text-gray-400 text-center py-8">No members found.</p>
+          <p className="text-center text-gray-400 py-8">No members found.</p>
         ) : (
           <div className="space-y-3 max-h-[550px] overflow-y-auto">
             {filteredMembers.map(member => {
-              const daysLeft = getDaysUntilDue(member.due_date);
-              const isActive = daysLeft > 0;
+              const membership = member.memberships[0];
+              if (!membership) return null;
+
+              const daysLeft = getDaysUntilDue(membership.end_date);
 
               return (
                 <div
                   key={member.id}
                   onClick={() => onSelectMember(member.id)}
-                  className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-orange-500 transition-colors cursor-pointer"
+                  className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-orange-500 cursor-pointer"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2">
+                  <div className="flex justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
                         <h4 className="text-lg font-semibold">{member.name}</h4>
-                        {isActive ? (
-                          <CheckCircle className="w-5 h-5 text-green-500 ml-2" />
+                        {daysLeft >= 0 ? (
+                          <CheckCircle className="text-green-500 w-5 h-5" />
                         ) : (
-                          <XCircle className="w-5 h-5 text-red-500 ml-2" />
+                          <XCircle className="text-red-500 w-5 h-5" />
                         )}
                       </div>
 
-                      <div className="space-y-1 text-sm">
-                        <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">ID:</span>{' '}
-                          {member.member_id}
-                        </p>
-                        <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">Package:</span>{' '}
-                          {member.package}
-                        </p>
-                        <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">Joined:</span>{' '}
-                          {new Date(member.date_of_joining).toLocaleDateString()}
+                      <div className="text-sm space-y-1 text-gray-400">
+                        <p><span className="text-orange-500">Member No:</span> {member.member_no}</p>
+                        <p><span className="text-orange-500">Package:</span> {membership.package}</p>
+                        <p>
+                          <span className="text-orange-500">Joined:</span>{' '}
+                          {new Date(membership.start_date).toLocaleDateString()}
                         </p>
                         <p
-  className={`font-medium ${
-    daysLeft < 0
-      ? 'text-red-500'
-      : daysLeft <= 7
-      ? 'text-yellow-400'
-      : 'text-green-400'
-  }`}
->
-  <span className="text-gray-400">Expires:</span>{' '}
-  {daysLeft < 0 ? 'Expired' : `${daysLeft} days left`}
-</p>
-
+                          className={`font-medium ${
+                            daysLeft < 0
+                              ? 'text-red-500'
+                              : daysLeft <= 7
+                              ? 'text-yellow-400'
+                              : 'text-green-400'
+                          }`}
+                        >
+                          Expires:{' '}
+                          {daysLeft < 0 ? 'Expired' : `${daysLeft} days left`}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="ml-4 flex gap-2">
-                      <button
-                        className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg transition"
-                        title="Edit"
-                      >
+                    <div className="flex gap-2">
+                      <button className="p-2 text-blue-400 hover:bg-blue-900/20 rounded">
                         <Edit className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={(e) => {
+                        onClick={e => {
                           e.stopPropagation();
                           window.open(`https://wa.me/${member.contact_number}`, '_blank');
                         }}
-                        className="p-2 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded-lg transition"
-                        title="WhatsApp"
+                        className="p-2 text-green-400 hover:bg-green-900/20 rounded"
                       >
                         <MessageCircle className="w-5 h-5" />
                       </button>
