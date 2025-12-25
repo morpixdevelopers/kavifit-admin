@@ -1,8 +1,24 @@
 import { useState, useEffect } from 'react';
-import { supabase, Member } from '../lib/supabase';
-import { Users, Edit, MessageCircle, CheckCircle, XCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Edit, MessageCircle, CheckCircle, XCircle } from 'lucide-react';
 
 type FilterType = 'all' | 'active' | 'expiring' | 'expired';
+
+interface Membership {
+  id: string;
+  package: string;
+  start_date: string;
+  end_date: string;
+}
+
+interface Member {
+  id: string;
+  name: string;
+  contact_number: string;
+  member_no: number;
+  created_at: string;
+  memberships: Membership[];
+}
 
 interface ViewMembersProps {
   onSelectMember: (memberId: string) => void;
@@ -19,23 +35,36 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
   const fetchMembers = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('members')
-      .select('*')
+      .select(`
+        id,
+        name,
+        contact_number,
+        member_no,
+        created_at,
+        memberships (
+          id,
+          package,
+          start_date,
+          end_date
+        )
+      `)
       .order('created_at', { ascending: false });
 
-    setMembers(data || []);
+    if (!error) setMembers(data || []);
     setLoading(false);
   };
 
-  const getDaysUntilDue = (dueDate: string) => {
-    const end = new Date(dueDate);
+  const getDaysUntilDue = (endDate: string) => {
+    const end = new Date(endDate);
     const now = new Date();
     return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const getMemberStatus = (dueDate: string): FilterType => {
-    const days = getDaysUntilDue(dueDate);
+  const getMemberStatus = (membership?: Membership): FilterType => {
+    if (!membership) return 'expired';
+    const days = getDaysUntilDue(membership.end_date);
     if (days > 7) return 'active';
     if (days >= 0) return 'expiring';
     return 'expired';
@@ -44,72 +73,50 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   const filteredMembers =
     filter === 'all'
       ? members
-      : members.filter(m => getMemberStatus(m.due_date) === filter);
+      : members.filter(m => {
+          const latestMembership = m.memberships[m.memberships.length - 1];
+          return getMemberStatus(latestMembership) === filter;
+        });
 
   const counts = {
     all: members.length,
-    active: members.filter(m => getMemberStatus(m.due_date) === 'active').length,
-    expiring: members.filter(m => getMemberStatus(m.due_date) === 'expiring').length,
-    expired: members.filter(m => getMemberStatus(m.due_date) === 'expired').length,
+    active: members.filter(m => getMemberStatus(m.memberships[m.memberships.length - 1]) === 'active').length,
+    expiring: members.filter(m => getMemberStatus(m.memberships[m.memberships.length - 1]) === 'expiring').length,
+    expired: members.filter(m => getMemberStatus(m.memberships[m.memberships.length - 1]) === 'expired').length,
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-white">
-
       {/* HEADER */}
       <div className="mb-8">
         <h2 className="text-3xl font-bold mb-2">Members</h2>
         <p className="text-gray-400">Manage gym members and subscriptions</p>
       </div>
 
-      {/* FILTER BUTTONS – ADMIN DESIGN */}
+      {/* FILTER BUTTONS */}
       <div className="mb-6 flex flex-wrap gap-3">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-            filter === 'all'
-              ? 'bg-gray-400 text-black'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-          }`}
-        >
-          All ({counts.all})
-        </button>
-
-        <button
-          onClick={() => setFilter('active')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-            filter === 'active'
-              ? 'bg-green-500 text-white'
-              : 'bg-green-900/30 text-green-300 hover:bg-green-900/50 border border-green-500/50'
-          }`}
-        >
-          Active ({counts.active})
-        </button>
-
-        <button
-          onClick={() => setFilter('expiring')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-            filter === 'expiring'
-              ? 'bg-yellow-500 text-black'
-              : 'bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50 border border-yellow-500/50'
-          }`}
-        >
-          Expiring ({counts.expiring})
-        </button>
-
-        <button
-          onClick={() => setFilter('expired')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-            filter === 'expired'
-              ? 'bg-red-500 text-white'
-              : 'bg-red-900/30 text-red-300 hover:bg-red-900/50 border border-red-500/50'
-          }`}
-        >
-          Expired ({counts.expired})
-        </button>
+        {(['all', 'active', 'expiring', 'expired'] as FilterType[]).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+              filter === f
+                ? 'bg-gray-400 text-black'
+                : f === 'active'
+                ? 'bg-green-900/30 text-green-300 hover:bg-green-900/50 border border-green-500/50'
+                : f === 'expiring'
+                ? 'bg-yellow-900/30 text-yellow-300 hover:bg-yellow-900/50 border border-yellow-500/50'
+                : f === 'expired'
+                ? 'bg-red-900/30 text-red-300 hover:bg-red-900/50 border border-red-500/50'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+            }`}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
+          </button>
+        ))}
       </div>
 
-      {/* MEMBER CARDS – ADMIN DESIGN */}
+      {/* MEMBER LIST */}
       <div className="bg-gray-900 rounded-lg shadow-xl p-6 border border-gray-800">
         <h3 className="text-xl font-semibold mb-6">Members List</h3>
 
@@ -120,8 +127,9 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
         ) : (
           <div className="space-y-3 max-h-[550px] overflow-y-auto">
             {filteredMembers.map(member => {
-              const daysLeft = getDaysUntilDue(member.due_date);
-              const isActive = daysLeft > 0;
+              const latestMembership = member.memberships[member.memberships.length - 1];
+              const daysLeft = latestMembership ? getDaysUntilDue(latestMembership.end_date) : null;
+              const isActive = daysLeft !== null ? daysLeft >= 0 : false;
 
               return (
                 <div
@@ -142,42 +150,37 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
                       <div className="space-y-1 text-sm">
                         <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">ID:</span>{' '}
-                          {member.member_id}
+                          <span className="text-orange-500 font-medium">Member No:</span> {member.member_no}
                         </p>
                         <p className="text-gray-400">
                           <span className="text-orange-500 font-medium">Package:</span>{' '}
-                          {member.package}
+                          {latestMembership?.package || 'N/A'}
                         </p>
                         <p className="text-gray-400">
                           <span className="text-orange-500 font-medium">Joined:</span>{' '}
-                          {new Date(member.date_of_joining).toLocaleDateString()}
+                          {latestMembership ? new Date(latestMembership.start_date).toLocaleDateString() : 'N/A'}
                         </p>
-                        <p
-  className={`font-medium ${
-    daysLeft < 0
-      ? 'text-red-500'
-      : daysLeft <= 7
-      ? 'text-yellow-400'
-      : 'text-green-400'
-  }`}
->
-  <span className="text-gray-400">Expires:</span>{' '}
-  {daysLeft < 0 ? 'Expired' : `${daysLeft} days left`}
-</p>
-
+                        <p className={`font-medium ${
+                          daysLeft === null
+                            ? 'text-gray-300'
+                            : daysLeft < 0
+                            ? 'text-red-500'
+                            : daysLeft <= 7
+                            ? 'text-yellow-400'
+                            : 'text-green-400'
+                        }`}>
+                          <span className="text-gray-400">Expires:</span>{' '}
+                          {daysLeft === null ? 'N/A' : daysLeft < 0 ? 'Expired' : `${daysLeft} days left`}
+                        </p>
                       </div>
                     </div>
 
                     <div className="ml-4 flex gap-2">
-                      <button
-                        className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg transition"
-                        title="Edit"
-                      >
+                      <button className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg transition" title="Edit">
                         <Edit className="w-5 h-5" />
                       </button>
                       <button
-                        onClick={(e) => {
+                        onClick={e => {
                           e.stopPropagation();
                           window.open(`https://wa.me/${member.contact_number}`, '_blank');
                         }}
