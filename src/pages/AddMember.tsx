@@ -12,41 +12,58 @@ export function AddMember() {
     setMessage(null);
 
     const formData = new FormData(e.currentTarget);
-    const dateOfJoining = formData.get('date_of_joining') as string;
+
+    const startDate = formData.get('date_of_joining') as string;
     const noOfMonths = Number(formData.get('no_of_months'));
 
-    const joiningDate = new Date(dateOfJoining);
-    const dueDate = new Date(joiningDate);
-    dueDate.setMonth(dueDate.getMonth() + noOfMonths);
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + noOfMonths);
 
-    const memberData = {
-      member_id: formData.get('member_id'),
-      name: formData.get('name'),
-      date_of_joining: dateOfJoining,
-      age: Number(formData.get('age')),
-      height: Number(formData.get('height')),
-      weight: Number(formData.get('weight')),
-      blood_group: formData.get('blood_group'),
-      contact_number: formData.get('contact_number'),
-      occupation: formData.get('occupation'),
-      address: formData.get('address'),
-      alcoholic: formData.get('alcoholic') === 'yes',
-      smoking_habit: formData.get('smoking_habit') === 'yes',
-      teetotaler: formData.get('teetotaler') === 'yes',
-      package: formData.get('package'),
-      no_of_months: noOfMonths,
-      due_date: dueDate.toISOString().split('T')[0],
-    };
+    /* -----------------------------
+       1. INSERT MEMBER
+    ------------------------------*/
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .insert({
+        name: formData.get('name'),
+        age: Number(formData.get('age')),
+        height: Number(formData.get('height')),
+        weight: Number(formData.get('weight')),
+        blood_group: formData.get('blood_group'),
+        contact_number: formData.get('contact_number'),
+        address: formData.get('address'),
+      })
+      .select()
+      .single();
 
-    const { error } = await supabase.from('members').insert([memberData]);
-
-    if (error) {
-      setMessage({ type: 'error', text: error.message });
-    } else {
-      setMessage({ type: 'success', text: 'Member added successfully' });
-      (e.target as HTMLFormElement).reset();
+    if (memberError || !member) {
+      setMessage({ type: 'error', text: memberError?.message || 'Failed to add member' });
+      setIsSubmitting(false);
+      return;
     }
 
+    /* -----------------------------
+       2. INSERT MEMBERSHIP
+    ------------------------------*/
+    const { error: membershipError } = await supabase
+      .from('memberships')
+      .insert({
+        member_id: member.id,
+        package: formData.get('package'),
+        no_of_months: noOfMonths,
+        start_date: start.toISOString().split('T')[0],
+        end_date: end.toISOString().split('T')[0],
+      });
+
+    if (membershipError) {
+      setMessage({ type: 'error', text: membershipError.message });
+      setIsSubmitting(false);
+      return;
+    }
+
+    setMessage({ type: 'success', text: 'Member added successfully' });
+    (e.target as HTMLFormElement).reset();
     setIsSubmitting(false);
   };
 
@@ -91,12 +108,7 @@ export function AddMember() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
                   <label className={label}>Full Name</label>
-                  <input name="name" placeholder="Full name" required className={input} />
-                </div>
-
-                <div>
-                  <label className={label}>Member ID</label>
-                  <input name="member_id" placeholder="Member ID" required className={input} />
+                  <input name="name" required className={input} />
                 </div>
 
                 <div>
@@ -106,32 +118,27 @@ export function AddMember() {
 
                 <div>
                   <label className={label}>Age</label>
-                  <input type="number" name="age" placeholder="Age" required className={input} />
+                  <input type="number" name="age" required className={input} />
                 </div>
 
                 <div>
                   <label className={label}>Height (cm)</label>
-                  <input type="number" name="height" placeholder="Height in cm" required className={input} />
+                  <input type="number" name="height" required className={input} />
                 </div>
 
                 <div>
                   <label className={label}>Weight (kg)</label>
-                  <input type="number" name="weight" placeholder="Weight in kg" required className={input} />
+                  <input type="number" name="weight" required className={input} />
                 </div>
 
-                {/* BLOOD GROUP */}
                 <div>
                   <label className={label}>Blood Group</label>
                   <select name="blood_group" required className={input}>
-                    <option value="">Select blood group</option>
-                    <option value="A+">A+</option>
-                    <option value="A-">A-</option>
-                    <option value="B+">B+</option>
-                    <option value="B-">B-</option>
-                    <option value="AB+">AB+</option>
-                    <option value="AB-">AB-</option>
-                    <option value="O+">O+</option>
-                    <option value="O-">O-</option>
+                    <option value="">Select</option>
+                    <option>A+</option><option>A-</option>
+                    <option>B+</option><option>B-</option>
+                    <option>AB+</option><option>AB-</option>
+                    <option>O+</option><option>O-</option>
                   </select>
                 </div>
               </div>
@@ -143,53 +150,12 @@ export function AddMember() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className={label}>Phone Number</label>
-                  <input name="contact_number" placeholder="Phone number" required className={input} />
-                </div>
-
-                <div>
-                  <label className={label}>Occupation</label>
-                  <input name="occupation" placeholder="Occupation" required className={input} />
+                  <input name="contact_number" required className={input} />
                 </div>
 
                 <div className="md:col-span-2">
                   <label className={label}>Address</label>
-                  <textarea
-                    name="address"
-                    rows={3}
-                    placeholder="Residential address"
-                    required
-                    className={input}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* HEALTH */}
-            <section>
-              <h3 className="text-lg font-semibold mb-4">Health Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className={label}>Alcohol Consumption</label>
-                  <select name="alcoholic" className={input}>
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className={label}>Smoking Habit</label>
-                  <select name="smoking_habit" className={input}>
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className={label}>Teetotaler</label>
-                  <select name="teetotaler" className={input}>
-                    <option value="no">No</option>
-                    <option value="yes">Yes</option>
-                  </select>
+                  <textarea name="address" rows={3} required className={input} />
                 </div>
               </div>
             </section>
@@ -201,19 +167,15 @@ export function AddMember() {
                 <div>
                   <label className={label}>Number of Months</label>
                   <select name="no_of_months" required className={input}>
-                    <option value="">Select duration</option>
                     {Array.from({ length: 12 }).map((_, i) => (
-                      <option key={i} value={i + 1}>
-                        {i + 1} month(s)
-                      </option>
+                      <option key={i} value={i + 1}>{i + 1} Month(s)</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
                   <label className={label}>Package</label>
-                  <select name="package" className={input}>
-                    <option value="">Choose package</option>
+                  <select name="package" required className={input}>
                     <option>Basic</option>
                     <option>Standard</option>
                     <option>Premium</option>
@@ -223,11 +185,10 @@ export function AddMember() {
               </div>
             </section>
 
-            {/* ACTION */}
             <div className="flex justify-end pt-4">
               <button
                 disabled={isSubmitting}
-                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-black font-semibold rounded-lg transition disabled:opacity-60"
+                className="px-8 py-3 bg-orange-500 hover:bg-orange-600 text-black font-semibold rounded-lg"
               >
                 {isSubmitting ? 'Adding...' : 'Add Member'}
               </button>
