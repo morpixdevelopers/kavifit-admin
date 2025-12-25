@@ -1,6 +1,31 @@
 import { useEffect, useState } from 'react';
-import { supabase, Member } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { ArrowLeft, Phone } from 'lucide-react';
+
+interface Membership {
+  id: string;
+  package: string;
+  no_of_months: number;
+  start_date: string;
+  end_date: string;
+}
+
+interface Member {
+  id: string;
+  member_no: number;
+  name: string;
+  age: number;
+  height: number;
+  weight: number;
+  blood_group: string;
+  contact_number: string;
+  address: string;
+  occupation?: string;
+  alcoholic?: boolean;
+  smoking_habit?: boolean;
+  teetotaler?: boolean;
+  created_at: string;
+}
 
 interface MemberDetailProps {
   memberId: string;
@@ -9,6 +34,7 @@ interface MemberDetailProps {
 
 export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
   const [member, setMember] = useState<Member | null>(null);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,15 +43,29 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
 
   const fetchMember = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+
+    // Fetch member
+    const { data: memberData, error: memberError } = await supabase
       .from('members')
       .select('*')
       .eq('id', memberId)
       .maybeSingle();
 
-    if (!error && data) {
-      setMember(data);
+    if (!memberData || memberError) {
+      setMember(null);
+      setLoading(false);
+      return;
     }
+    setMember(memberData);
+
+    // Fetch memberships
+    const { data: membershipData } = await supabase
+      .from('memberships')
+      .select('*')
+      .eq('member_id', memberId)
+      .order('start_date', { ascending: true });
+
+    setMemberships(membershipData || []);
     setLoading(false);
   };
 
@@ -56,24 +96,26 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     );
   }
 
-  const getDaysUntilDue = (dueDate: string): number => {
+  // Get latest membership
+  const latestMembership = memberships[memberships.length - 1];
+
+  const getDaysUntilDue = (dueDate: string) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const due = new Date(dueDate);
     due.setHours(0, 0, 0, 0);
     const diffTime = due.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const getMemberStatus = (dueDate: string): 'active' | 'expiring' | 'expired' => {
-    const daysUntilDue = getDaysUntilDue(dueDate);
-    if (daysUntilDue >= 7) return 'active';
-    if (daysUntilDue >= 0 && daysUntilDue < 7) return 'expiring';
+  const getMemberStatus = (dueDate: string) => {
+    const days = getDaysUntilDue(dueDate);
+    if (days >= 7) return 'active';
+    if (days >= 0) return 'expiring';
     return 'expired';
   };
 
-  const getStatusColor = (status: 'active' | 'expiring' | 'expired'): string => {
+  const getStatusColor = (status: 'active' | 'expiring' | 'expired') => {
     switch (status) {
       case 'active':
         return 'bg-green-900 text-green-200 border-green-700';
@@ -84,8 +126,8 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     }
   };
 
-  const status = getMemberStatus(member.due_date);
-  const daysUntilDue = getDaysUntilDue(member.due_date);
+  const status = latestMembership ? getMemberStatus(latestMembership.end_date) : 'expired';
+  const daysUntilDue = latestMembership ? getDaysUntilDue(latestMembership.end_date) : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-black py-8 px-4">
@@ -105,19 +147,24 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 <h1 className="text-4xl font-bold text-white mb-2">{member.name}</h1>
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2 text-yellow-200">
-                    <span className="text-lg">ID: {member.member_id}</span>
+                    <span className="text-lg">ID: {member.member_no}</span>
                   </div>
-                  <div
-                    className={`inline-block px-4 py-1 rounded-full text-sm font-semibold border ${getStatusColor(status)}`}
-                  >
-                    {status === 'active' ? 'Active' : status === 'expiring' ? 'Expiring Soon' : 'Expired'}
-                  </div>
+                  {latestMembership && (
+                    <div className={`inline-block px-4 py-1 rounded-full text-sm font-semibold border ${getStatusColor(status)}`}>
+                      {status === 'active'
+                        ? 'Active'
+                        : status === 'expiring'
+                        ? 'Expiring Soon'
+                        : 'Expired'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
           <div className="p-8 space-y-8">
+            {/* Contact & Personal Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-slate-700 rounded-lg p-6 border border-slate-600">
                 <h3 className="text-sm font-semibold text-slate-300 uppercase mb-4">Contact Information</h3>
@@ -135,7 +182,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </div>
                   <div className="pt-3 border-t border-slate-600">
                     <p className="text-xs text-slate-400 mb-1">Occupation</p>
-                    <p className="text-slate-200">{member.occupation}</p>
+                    <p className="text-slate-200">{member.occupation || 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -163,6 +210,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
               </div>
             </div>
 
+            {/* Health Habits & Membership Status */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-slate-700 rounded-lg p-6 border border-slate-600">
                 <h3 className="text-sm font-semibold text-slate-300 uppercase mb-4">Health Habits</h3>
@@ -190,63 +238,70 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
 
               <div className="bg-slate-700 rounded-lg p-6 border border-slate-600">
                 <h3 className="text-sm font-semibold text-slate-300 uppercase mb-4">Membership Status</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <p className="text-slate-400">Joining Date</p>
-                    <p className="text-white font-medium">
-                      {new Date(member.date_of_joining).toLocaleDateString()}
-                    </p>
+                {latestMembership ? (
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <p className="text-slate-400">Joining Date</p>
+                      <p className="text-white font-medium">
+                        {new Date(latestMembership.start_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex justify-between">
+                      <p className="text-slate-400">Due Date</p>
+                      <p className="text-white font-medium">
+                        {new Date(latestMembership.end_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex justify-between">
+                      <p className="text-slate-400">Days Remaining</p>
+                      <p
+                        className={`font-bold text-lg ${
+                          daysUntilDue! < 0
+                            ? 'text-red-400'
+                            : daysUntilDue! < 7
+                            ? 'text-yellow-400'
+                            : 'text-green-400'
+                        }`}
+                      >
+                        {daysUntilDue! < 0 ? `${Math.abs(daysUntilDue!)} overdue` : `${daysUntilDue} days`}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <p className="text-slate-400">Due Date</p>
-                    <p className="text-white font-medium">
-                      {new Date(member.due_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="flex justify-between">
-                    <p className="text-slate-400">Days Remaining</p>
-                    <p
-                      className={`font-bold text-lg ${
-                        daysUntilDue < 0
-                          ? 'text-red-400'
-                          : daysUntilDue < 7
-                          ? 'text-yellow-400'
-                          : 'text-green-400'
-                      }`}
-                    >
-                      {daysUntilDue < 0 ? `${Math.abs(daysUntilDue)} overdue` : `${daysUntilDue} days`}
-                    </p>
-                  </div>
-                </div>
+                ) : (
+                  <p>No active membership</p>
+                )}
               </div>
             </div>
 
+            {/* Membership History */}
             <div className="bg-slate-700 rounded-lg p-6 border border-slate-600">
               <h3 className="text-sm font-semibold text-slate-300 uppercase mb-4">Membership History</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-600">
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">Package</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">No of Months</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">Join/Renew Date</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">Due Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-slate-600 hover:bg-slate-600 transition-colors">
-                      <td className="px-4 py-3 text-slate-200 font-medium">{member.package}</td>
-                      <td className="px-4 py-3 text-slate-200">{member.no_of_months} months</td>
-                      <td className="px-4 py-3 text-slate-200">
-                        {new Date(member.date_of_joining).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-slate-200 font-medium">
-                        {new Date(member.due_date).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {memberships.length === 0 ? (
+                <p>No memberships</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-slate-600">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">Package</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">No of Months</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">Join/Renew Date</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-slate-300">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {memberships.map(m => (
+                        <tr key={m.id} className="border-b border-slate-600 hover:bg-slate-600 transition-colors">
+                          <td className="px-4 py-3 text-slate-200 font-medium">{m.package}</td>
+                          <td className="px-4 py-3 text-slate-200">{m.no_of_months} months</td>
+                          <td className="px-4 py-3 text-slate-200">{new Date(m.start_date).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-slate-200 font-medium">{new Date(m.end_date).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
