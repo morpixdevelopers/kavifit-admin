@@ -7,6 +7,8 @@ import {
   XCircle,
   X,
   Search,
+  UserMinus,
+  User,
 } from "lucide-react";
 
 type FilterType = "all" | "active" | "expiring" | "expired";
@@ -28,6 +30,7 @@ interface Member {
   member_no: number;
   created_at: string;
   memberships: Membership[];
+  is_inactive?: boolean;
 }
 
 interface ViewMembersProps {
@@ -53,21 +56,22 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
     balance_amount: 0,
   });
 
-  // AUTO-CALCULATE END DATE
+  useEffect(() => {
+    fetchMembers();
+  }, []);
+
   useEffect(() => {
     if (formData.start_date && formData.no_of_months > 0) {
       const start = new Date(formData.start_date);
       const end = new Date(
         start.setMonth(start.getMonth() + formData.no_of_months)
       );
-      const formattedEndDate = end.toISOString().split("T")[0];
-      setFormData((prev) => ({ ...prev, end_date: formattedEndDate }));
+      setFormData((prev) => ({
+        ...prev,
+        end_date: end.toISOString().split("T")[0],
+      }));
     }
   }, [formData.start_date, formData.no_of_months]);
-
-  useEffect(() => {
-    fetchMembers();
-  }, []);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -75,7 +79,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
       .from("members")
       .select(
         `
-        id, name, contact_number, member_no, created_at,
+        id, name, contact_number, member_no, created_at, is_inactive,
         memberships ( id, package, start_date, end_date, amount_paid, total_amount )
       `
       )
@@ -85,25 +89,40 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
       const normalized = data.map((m: any) => ({
         ...m,
         memberships: m.memberships ?? [],
+        is_inactive: m.is_inactive ?? false,
       }));
       setMembers(normalized);
     }
     setLoading(false);
   };
 
-  const handleOpenEdit = (e: React.MouseEvent, member: Member) => {
+  const handleDeactivate = async (e: React.MouseEvent, memberId: string) => {
     e.stopPropagation();
-    setSelectedMemberForEdit(member);
-    setIsModalOpen(true);
+    const confirm = window.confirm("Mark this member as Inactive?");
+    if (confirm) {
+      const { error } = await supabase
+        .from("members")
+        .update({ is_inactive: true })
+        .eq("id", memberId);
+
+      if (!error) fetchMembers();
+      else alert("Error: " + error.message);
+    }
   };
 
   const handleRenew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMemberForEdit) return;
 
-    const totalAmountCalculated =
-      Number(formData.amount_paid) + Number(formData.balance_amount);
+    if (selectedMemberForEdit.is_inactive) {
+      await supabase
+        .from("members")
+        .update({ is_inactive: false })
+        .eq("id", selectedMemberForEdit.id);
+    }
 
+    const totalAmount =
+      Number(formData.amount_paid) + Number(formData.balance_amount);
     const { error } = await supabase.from("memberships").insert([
       {
         member_id: selectedMemberForEdit.id,
@@ -112,119 +131,111 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
         start_date: formData.start_date,
         end_date: formData.end_date,
         amount_paid: formData.amount_paid,
-        total_amount: totalAmountCalculated,
+        total_amount: totalAmount,
       },
     ]);
 
     if (!error) {
       setIsModalOpen(false);
       fetchMembers();
-      alert("New membership record added!");
-    } else {
-      alert("Error: " + error.message);
+      alert("Membership Record Updated!");
     }
   };
 
   const getDaysUntilDue = (endDate: string) => {
-    const end = new Date(endDate);
-    const now = new Date();
-    return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+      (new Date(endDate).getTime() - new Date().getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
   };
 
-  const getLatestMembership = (memberships: Membership[]) =>
-    memberships.length > 0 ? memberships[memberships.length - 1] : undefined;
+  const getLatestMembership = (m: Membership[]) =>
+    m.length > 0 ? m[m.length - 1] : undefined;
 
   const getMemberStatus = (membership?: Membership): FilterType | "none" => {
-    if (!membership) return "none"; // Special status for people with NO memberships
+    if (!membership) return "none";
     const days = getDaysUntilDue(membership.end_date);
     if (days > 7) return "active";
     if (days >= 0) return "expiring";
     return "expired";
   };
 
-  // Logic:
-  // 1. Search filter first
-  // 2. Tab filter second (If 'none', only show in 'all')
   const processedMembers = members.filter((m) => {
     const matchesSearch =
       m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.member_no.toString().includes(searchQuery);
-
-    const status = getMemberStatus(getLatestMembership(m.memberships));
-
     if (!matchesSearch) return false;
     if (filter === "all") return true;
-    return status === filter; // status 'none' will naturally fail here, showing only in 'all'
+    if (m.is_inactive) return false;
+    return getMemberStatus(getLatestMembership(m.memberships)) === filter;
   });
 
   const counts = {
     all: members.length,
     active: members.filter(
-      (m) => getMemberStatus(getLatestMembership(m.memberships)) === "active"
+      (m) =>
+        !m.is_inactive &&
+        getMemberStatus(getLatestMembership(m.memberships)) === "active"
     ).length,
     expiring: members.filter(
-      (m) => getMemberStatus(getLatestMembership(m.memberships)) === "expiring"
+      (m) =>
+        !m.is_inactive &&
+        getMemberStatus(getLatestMembership(m.memberships)) === "expiring"
     ).length,
     expired: members.filter(
-      (m) => getMemberStatus(getLatestMembership(m.memberships)) === "expired"
+      (m) =>
+        !m.is_inactive &&
+        getMemberStatus(getLatestMembership(m.memberships)) === "expired"
     ).length,
   };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 text-white">
+      {/* Header & Search */}
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold">Members</h2>
           <p className="text-gray-400">Manage gym members and subscriptions</p>
         </div>
-
-        {/* SEARCH BAR */}
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Search name or admission id..."
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-white focus:border-orange-500 outline-none transition-all"
+            placeholder="Search name or ID..."
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg py-2 pl-10 pr-4 text-white focus:border-orange-500 outline-none"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
+      {/* Filter Tabs */}
       <div className="mb-6 flex flex-wrap gap-3">
-        {(["all", "active", "expiring", "expired"] as FilterType[]).map((f) => {
-          const activeColors = {
-            all: "bg-gray-400 text-black border-gray-400",
-            active: "bg-black text-green-500 border-green-600",
-            expiring: "bg-black text-yellow-500 border-yellow-500",
-            expired: "bg-black text-red-500 border-red-600",
-          };
-
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-6 py-2 rounded-lg font-semibold border-2 transition-colors ${
-                filter === f
-                  ? activeColors[f]
-                  : "bg-gray-700 text-gray-300 border-transparent hover:bg-gray-600"
-              }`}
-            >
-              {f.toUpperCase()} ({counts[f]})
-            </button>
-          );
-        })}
+        {(["all", "active", "expiring", "expired"] as FilterType[]).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-6 py-2 rounded-lg font-semibold border-2 transition-all ${
+              filter === f
+                ? "bg-orange-500 border-orange-500 text-white"
+                : "bg-gray-800 border-transparent text-gray-400"
+            }`}
+          >
+            {f.toUpperCase()} ({counts[f]})
+          </button>
+        ))}
       </div>
 
+      {/* Members List */}
       <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
         {loading ? (
-          <p className="text-center text-gray-400 py-8">Loading members...</p>
+          <p className="text-center py-10 text-gray-500">Loading members...</p>
         ) : processedMembers.length === 0 ? (
-          <p className="text-center text-gray-400 py-8">
+          <p className="text-center py-10 text-gray-500">
             No members match your criteria.
           </p>
         ) : (
-          <div className="space-y-3 max-h-[550px] overflow-y-auto pr-2">
+          <div className="space-y-3">
             {processedMembers.map((member) => {
               const latest = getLatestMembership(member.memberships);
               const daysLeft = latest ? getDaysUntilDue(latest.end_date) : null;
@@ -234,55 +245,72 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                 <div
                   key={member.id}
                   onClick={() => onSelectMember(member.id)}
-                  className="bg-gray-800 border border-gray-700 rounded-lg p-4 hover:border-orange-500 cursor-pointer transition-all"
+                  className="bg-gray-800 border border-gray-700 p-4 rounded-lg cursor-pointer hover:border-orange-500 transition-all"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="text-lg font-semibold">{member.name}</h4>
-                        {/* ICON LOGIC: Green if active/expiring, Red if expired or NO membership */}
-                        {status === "active" || status === "expiring" ? (
-                          <CheckCircle className="text-green-500 w-5 h-5" />
-                        ) : (
-                          <XCircle className="text-red-500 w-5 h-5" />
-                        )}
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                        <User className="text-orange-500" size={20} />
                       </div>
-                      <p className="text-sm text-gray-400">
-                        Admission No: {member.member_no}
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Package: {latest?.package ?? "None"}
-                      </p>
-                      <p className="text-sm text-gray-400">
-                        Status:{" "}
-                        {daysLeft === null
-                          ? "No Membership"
-                          : daysLeft < 0
-                          ? "Expired"
-                          : `${daysLeft} days left`}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-bold text-lg">{member.name}</h4>
+                          {member.is_inactive ? (
+                            <span className="text-[10px] bg-red-500/20 text-red-500 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
+                              Inactive
+                            </span>
+                          ) : status === "active" || status === "expiring" ? (
+                            <CheckCircle className="text-green-500 w-4 h-4" />
+                          ) : (
+                            <XCircle className="text-red-500 w-4 h-4" />
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          ID: {member.member_no} •{" "}
+                          {latest?.package || "No Package"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {member.is_inactive
+                            ? "Status: No longer a member"
+                            : daysLeft === null
+                            ? "Status: No record"
+                            : daysLeft < 0
+                            ? "Status: Expired"
+                            : `Status: ${daysLeft} days left`}
+                        </p>
+                      </div>
                     </div>
 
                     <div className="flex gap-2">
+                      {!member.is_inactive && (
+                        <button
+                          onClick={(e) => handleDeactivate(e, member.id)}
+                          className="p-2 text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                          title="Set Inactive"
+                        >
+                          <UserMinus size={20} />
+                        </button>
+                      )}
                       <button
-                        onClick={(e) => handleOpenEdit(e, member)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMemberForEdit(member);
+                          setIsModalOpen(true);
+                        }}
                         className="p-2 text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
-                        title="Renew Membership"
+                        title="Renew"
                       >
-                        <Edit className="w-5 h-5" />
+                        <Edit size={20} />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(
-                            `https://wa.me/${member.contact_number}`,
-                            "_blank"
-                          );
+                          window.open(`https://wa.me/${member.contact_number}`);
                         }}
                         className="p-2 text-green-400 hover:bg-green-900/20 rounded transition-colors"
-                        title="Contact on WhatsApp"
+                        title="WhatsApp"
                       >
-                        <MessageCircle className="w-5 h-5" />
+                        <MessageCircle size={20} />
                       </button>
                     </div>
                   </div>
@@ -293,7 +321,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
         )}
       </div>
 
-      {/* RENEW/EDIT MODAL */}
+      {/* RENEW MODAL with Freezed Header */}
       {isModalOpen && selectedMemberForEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-slate-800 border border-orange-500 rounded-xl max-w-md w-full p-6 shadow-2xl">
@@ -305,45 +333,40 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                 onClick={() => setIsModalOpen(false)}
                 className="text-gray-400 hover:text-white"
               >
-                <X className="w-6 h-6" />
+                <X />
               </button>
             </div>
 
-            <form onSubmit={handleRenew} className="space-y-4 text-left">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleRenew} className="space-y-4">
+              {/* FREEZED FIELDS (Read Only) */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
                 <div>
-                  <label className="block text-xs text-gray-400 uppercase mb-1">
-                    Name
+                  <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
+                    Member Name
                   </label>
-                  <input
-                    type="text"
-                    disabled
-                    value={selectedMemberForEdit.name}
-                    className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-gray-300 cursor-not-allowed"
-                  />
+                  <div className="text-white font-semibold truncate">
+                    {selectedMemberForEdit.name}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 uppercase mb-1">
+                  <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
                     Admission No
                   </label>
-                  <input
-                    type="text"
-                    disabled
-                    value={selectedMemberForEdit.member_no}
-                    className="w-full bg-slate-700 border border-slate-600 rounded p-2 text-gray-300 cursor-not-allowed"
-                  />
+                  <div className="text-white font-semibold">
+                    {selectedMemberForEdit.member_no}
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 uppercase mb-1">
-                  Package
+                <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                  Package Name
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Monthly Gym"
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-orange-500 outline-none"
+                  placeholder="e.g. 1 Month Premium"
+                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-orange-500"
                   onChange={(e) =>
                     setFormData({ ...formData, package: e.target.value })
                   }
@@ -352,15 +375,14 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-400 uppercase mb-1">
-                    No of Months
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Months
                   </label>
                   <input
                     type="number"
                     min="1"
-                    required
                     value={formData.no_of_months}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-orange-500 outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -370,13 +392,13 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 uppercase mb-1">
-                    Amount Paid (₹)
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Amount Paid
                   </label>
                   <input
                     type="number"
                     required
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-orange-500 outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -389,41 +411,38 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-gray-400 uppercase mb-1">
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
                     Start Date
                   </label>
                   <input
                     type="date"
-                    required
                     value={formData.start_date}
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none"
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
                     onChange={(e) =>
                       setFormData({ ...formData, start_date: e.target.value })
                     }
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 uppercase mb-1">
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
                     End Date (Auto)
                   </label>
                   <input
                     type="date"
-                    required
                     readOnly
                     value={formData.end_date}
-                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-orange-400 cursor-default outline-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-orange-400 cursor-default"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs text-gray-400 uppercase mb-1">
-                  Balance Amount (₹)
+                <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                  Balance Due
                 </label>
                 <input
                   type="number"
-                  required
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-red-400 focus:border-orange-500 outline-none"
+                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-red-400"
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -435,9 +454,11 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
 
               <button
                 type="submit"
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg mt-4 transition-colors"
+                className="w-full bg-orange-500 hover:bg-orange-600 font-bold py-3 rounded-lg mt-4 transition-colors"
               >
-                Add Membership Record
+                {selectedMemberForEdit.is_inactive
+                  ? "Reactivate & Add Record"
+                  : "Add Membership Record"}
               </button>
             </form>
           </div>

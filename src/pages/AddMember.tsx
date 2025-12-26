@@ -16,6 +16,11 @@ export function AddMember() {
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [contactNumber, setContactNumber] = useState<string>("");
 
+  // Health Habits States
+  const [alcoholic, setAlcoholic] = useState<boolean>(false);
+  const [smokingHabit, setSmokingHabit] = useState<boolean>(false);
+  const [teetotaler, setTeetotaler] = useState<boolean>(false);
+
   const balanceDue = totalAmount - amountPaid;
   const isPhoneValid = contactNumber.length === 10;
 
@@ -66,9 +71,12 @@ export function AddMember() {
         weight: Number(formData.get("weight")),
         blood_group: formData.get("blood_group"),
         contact_number: contactNumber,
-        occupation: formData.get("occupation"), // Added occupation
+        occupation: formData.get("occupation"),
         address: formData.get("address"),
         photo: photoUrl,
+        alcoholic: alcoholic,
+        smoking_habit: smokingHabit,
+        teetotaler: teetotaler,
       })
       .select()
       .single();
@@ -103,6 +111,9 @@ export function AddMember() {
       setTotalAmount(0);
       setAmountPaid(0);
       setContactNumber("");
+      setAlcoholic(false);
+      setSmokingHabit(false);
+      setTeetotaler(false);
     }
     setIsSubmitting(false);
   };
@@ -282,6 +293,50 @@ export function AddMember() {
                   className={input}
                 />
               </div>
+            </div>
+          </section>
+
+          {/* HEALTH HABITS */}
+          <section>
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">
+              Health Habits
+            </h3>
+            <div className="flex flex-wrap gap-8 bg-[#334155]/30 p-4 rounded-lg border border-[#2f4050]">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={alcoholic}
+                  onChange={(e) => setAlcoholic(e.target.checked)}
+                  className="w-5 h-5 rounded border-[#2f4050] bg-[#334155] text-orange-500 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
+                  Alcoholic
+                </span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={smokingHabit}
+                  onChange={(e) => setSmokingHabit(e.target.checked)}
+                  className="w-5 h-5 rounded border-[#2f4050] bg-[#334155] text-orange-500 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
+                  Smoking Habit
+                </span>
+              </label>
+
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={teetotaler}
+                  onChange={(e) => setTeetotaler(e.target.checked)}
+                  className="w-5 h-5 rounded border-[#2f4050] bg-[#334155] text-orange-500 focus:ring-orange-500"
+                />
+                <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
+                  Teetotaler
+                </span>
+              </label>
             </div>
           </section>
 

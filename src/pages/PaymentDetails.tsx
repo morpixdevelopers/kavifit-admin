@@ -60,82 +60,96 @@ export function Payments() {
       59
     ).toISOString();
 
-    // 1. Global Totals (Members and Life-time Cash)
-    const { count: memberCount } = await supabase
-      .from("members")
-      .select("*", { count: "exact", head: true });
+    try {
+      // 1. Global Totals - UPDATED TO FILTER ONLY ACTIVE MEMBERS
+      const { count: activeMemberCount } = await supabase
+        .from("members")
+        .select("*", { count: "exact", head: true })
+        .eq("is_inactive", false);
 
-    const { data: allEarnings } = await supabase
-      .from("memberships")
-      .select("amount_paid");
-    const allTimeTotal =
-      allEarnings?.reduce((sum, m) => sum + Number(m.amount_paid), 0) || 0;
+      const { data: allEarnings } = await supabase
+        .from("memberships")
+        .select("amount_paid");
 
-    // 2. Monthly Filtered Memberships
-    const { data: memberships, error } = await supabase
-      .from("memberships")
-      .select(
+      const allTimeTotal =
+        allEarnings?.reduce((sum, m) => sum + Number(m.amount_paid), 0) || 0;
+
+      // 2. Monthly Filtered Memberships
+      const { data: memberships, error } = await supabase
+        .from("memberships")
+        .select(
+          `
+          id,
+          amount_paid, 
+          total_amount, 
+          member_id, 
+          created_at,
+          members (name, contact_number)
         `
-        amount_paid, 
-        total_amount, 
-        member_id, 
-        created_at,
-        members (name, contact_number)
-      `
-      )
-      .gte("created_at", start)
-      .lte("created_at", end);
+        )
+        .gte("created_at", start)
+        .lte("created_at", end)
+        .order("created_at", { ascending: true });
 
-    if (!error && memberships) {
-      let monthlyEarned = 0;
-      let monthlyBalance = 0;
-      let newCount = 0;
-      let renewCount = 0;
+      if (error) throw error;
 
-      const paidList: any[] = [];
-      const pendingList: any[] = [];
+      if (memberships) {
+        let monthlyEarned = 0;
+        let monthlyBalance = 0;
+        let newCount = 0;
+        let renewCount = 0;
+        const paidList: any[] = [];
+        const pendingList: any[] = [];
 
-      for (const m of memberships) {
-        const amtPaid = Number(m.amount_paid);
-        const total = Number(m.total_amount);
-        const bal = total - amtPaid;
+        const seenInThisBatch = new Set();
 
-        monthlyEarned += amtPaid;
-        monthlyBalance += bal;
+        for (const m of memberships) {
+          const amtPaid = Number(m.amount_paid);
+          const total = Number(m.total_amount);
+          const bal = total - amtPaid;
 
-        if (bal <= 0) paidList.push(m);
-        else pendingList.push(m);
+          monthlyEarned += amtPaid;
+          monthlyBalance += bal;
 
-        // Check if member has history before this month (New vs Renew)
-        const { count } = await supabase
-          .from("memberships")
-          .select("*", { count: "exact", head: true })
-          .eq("member_id", m.member_id)
-          .lt("created_at", start);
+          if (bal <= 0) paidList.push(m);
+          else pendingList.push(m);
 
-        if (count === 0) newCount++;
-        else renewCount++;
+          const { count } = await supabase
+            .from("memberships")
+            .select("*", { count: "exact", head: true })
+            .eq("member_id", m.member_id)
+            .lt("created_at", m.created_at);
+
+          if ((count && count > 0) || seenInThisBatch.has(m.member_id)) {
+            renewCount++;
+          } else {
+            newCount++;
+            seenInThisBatch.add(m.member_id);
+          }
+        }
+
+        setStats({
+          newMembers: newCount,
+          renewals: renewCount,
+          earnedAmount: monthlyEarned,
+          balanceAmount: monthlyBalance,
+          allTimeEarnings: allTimeTotal,
+          totalGymMembers: activeMemberCount || 0,
+        });
+        setPaidMembers(paidList);
+        setPendingMembers(pendingList);
       }
-
-      setStats({
-        newMembers: newCount,
-        renewals: renewCount,
-        earnedAmount: monthlyEarned,
-        balanceAmount: monthlyBalance,
-        allTimeEarnings: allTimeTotal,
-        totalGymMembers: memberCount || 0,
-      });
-      setPaidMembers(paidList);
-      setPendingMembers(pendingList);
+    } catch (err) {
+      console.error("Dashboard Error:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchDashboardData();
   }, [selectedMonth, selectedYear]);
 
-  // Handle Arrow Clicks
   const handlePrevMonth = () => {
     if (selectedMonth === 0) {
       setSelectedMonth(11);
@@ -165,7 +179,6 @@ export function Payments() {
   return (
     <div className="min-h-screen bg-slate-900 p-4 sm:p-8 text-white font-sans">
       <div className="max-w-5xl mx-auto">
-        {/* Top Header & All-time Stats Badges */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
@@ -181,7 +194,7 @@ export function Payments() {
               <div className="flex items-center gap-2 text-slate-500 mb-1">
                 <Users className="h-4 w-4" />
                 <span className="text-[10px] uppercase font-black tracking-widest">
-                  Total Gym Members
+                  Active Gym Members
                 </span>
               </div>
               <p className="text-2xl font-bold text-white">
@@ -202,7 +215,6 @@ export function Payments() {
           </div>
         </div>
 
-        {/* Navigation Bar (Arrows + Dropdowns) */}
         <div className="flex items-center bg-slate-800/50 border border-slate-700 p-2 rounded-2xl mb-10 w-fit">
           <button
             onClick={handlePrevMonth}
@@ -247,22 +259,21 @@ export function Payments() {
 
         {loading ? (
           <div className="flex justify-center py-24">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-r-transparent shadow-[0_0_20px_rgba(249,115,22,0.3)]"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-orange-500 border-r-transparent"></div>
           </div>
         ) : (
           <>
-            {/* Monthly Summary Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
-              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden group">
+              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
                 <UserPlus className="h-8 w-8 text-blue-500 mb-4" />
                 <p className="text-slate-400 text-xs font-black uppercase tracking-widest">
-                  New Memberships
+                  New Joining
                 </p>
                 <h2 className="text-4xl font-bold mt-2">{stats.newMembers}</h2>
               </div>
 
-              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden">
+              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
                 <RefreshCw className="h-8 w-8 text-purple-500 mb-4" />
                 <p className="text-slate-400 text-xs font-black uppercase tracking-widest">
@@ -271,7 +282,7 @@ export function Payments() {
                 <h2 className="text-4xl font-bold mt-2">{stats.renewals}</h2>
               </div>
 
-              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden">
+              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
                 <TrendingUp className="h-8 w-8 text-green-500 mb-4" />
                 <p className="text-slate-400 text-xs font-black uppercase tracking-widest text-green-500/80">
@@ -282,7 +293,7 @@ export function Payments() {
                 </h2>
               </div>
 
-              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 shadow-xl relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900">
+              <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 relative overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900">
                 <div className="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
                 <Wallet className="h-8 w-8 text-orange-500 mb-4" />
                 <p className="text-slate-400 text-xs font-black uppercase tracking-widest text-orange-500/80">
@@ -294,7 +305,6 @@ export function Payments() {
               </div>
             </div>
 
-            {/* List Section */}
             <div className="bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden shadow-2xl mb-10">
               <div className="flex bg-slate-800/50">
                 <button
@@ -376,7 +386,7 @@ export function Payments() {
                                     m.total_amount - m.amount_paid
                                   )
                                 }
-                                className="bg-green-500/10 text-green-500 p-3 rounded-2xl hover:bg-green-600 hover:text-white transition-all shadow-lg shadow-green-900/40"
+                                className="bg-green-500/10 text-green-500 p-3 rounded-2xl hover:bg-green-600 hover:text-white transition-all shadow-lg"
                               >
                                 <MessageCircle className="h-6 w-6" />
                               </button>

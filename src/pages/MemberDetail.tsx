@@ -1,6 +1,14 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
-import { ArrowLeft, Phone, MoreVertical, X, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Phone,
+  MoreVertical,
+  X,
+  CheckCircle2,
+  UserMinus,
+  UserPlus,
+} from "lucide-react";
 
 interface Membership {
   id: string;
@@ -26,6 +34,7 @@ interface Member {
   alcoholic?: boolean;
   smoking_habit?: boolean;
   teetotaler?: boolean;
+  is_inactive?: boolean;
   created_at: string;
 }
 
@@ -39,11 +48,9 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal Visibility States
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
-  // Form States
   const [memberForm, setMemberForm] = useState<Partial<Member>>({});
   const [historyForm, setHistoryForm] = useState({
     package: "",
@@ -75,19 +82,13 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     }
   }, [member]);
 
-  // AUTO-CALCULATE DUE DATE EFFECT
   useEffect(() => {
     if (historyForm.start_date && historyForm.no_of_months > 0) {
       const startDate = new Date(historyForm.start_date);
-      // Add months to the start date
       const dueDate = new Date(
         startDate.setMonth(startDate.getMonth() + historyForm.no_of_months)
       );
-
-      // Format back to YYYY-MM-DD for the date input
       const formattedDueDate = dueDate.toISOString().split("T")[0];
-
-      // Only update if it's different to prevent infinite loops
       if (formattedDueDate !== historyForm.end_date) {
         setHistoryForm((prev) => ({ ...prev, end_date: formattedDueDate }));
       }
@@ -111,6 +112,17 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
 
     setMemberships(membershipData || []);
     setLoading(false);
+  };
+
+  const toggleInactivate = async () => {
+    if (!member) return;
+    const newStatus = !member.is_inactive;
+    const { error } = await supabase
+      .from("members")
+      .update({ is_inactive: newStatus })
+      .eq("id", memberId);
+
+    if (!error) fetchMember();
   };
 
   const latestMembership = memberships[0];
@@ -149,7 +161,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
   const handleUpdateHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!latestMembership) return;
-
     const total =
       Number(historyForm.amount_paid) + Number(historyForm.balance_amount);
     const { error } = await supabase
@@ -186,13 +197,14 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     Math.ceil(
       (new Date(date).getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000
     );
-  const status = latestMembership
-    ? getDaysUntilDue(latestMembership.end_date) >= 7
-      ? "active"
-      : getDaysUntilDue(latestMembership.end_date) >= 0
-      ? "expiring"
-      : "expired"
-    : "expired";
+
+  let status = "expired";
+  if (member.is_inactive) {
+    status = "inactive";
+  } else if (latestMembership) {
+    const days = getDaysUntilDue(latestMembership.end_date);
+    status = days >= 7 ? "active" : days >= 0 ? "expiring" : "expired";
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 py-8 px-4 font-sans text-white">
@@ -206,13 +218,28 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
         </button>
 
         <div className="bg-slate-800 rounded-xl shadow-2xl overflow-hidden border border-orange-500/30 relative">
-          <button
-            onClick={() => setIsMemberModalOpen(true)}
-            className="absolute top-6 right-6 p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
-          >
-            <MoreVertical className="h-6 w-6" />
-          </button>
+          {/* TOP ACTIONS - FIXED VISIBILITY */}
+          <div className="absolute top-6 right-6 flex items-center space-x-2">
+            <button
+              onClick={toggleInactivate}
+              title={member.is_inactive ? "Mark as Active" : "Mark as Inactive"}
+              className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all border border-white/10"
+            >
+              {member.is_inactive ? (
+                <UserPlus className="h-5 w-5" />
+              ) : (
+                <UserMinus className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              onClick={() => setIsMemberModalOpen(true)}
+              className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all border border-white/10"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </button>
+          </div>
 
+          {/* Header Section */}
           <div className="bg-gradient-to-r from-orange-600 to-red-700 px-8 py-6">
             <h1 className="text-4xl font-bold text-white mb-2">
               {member.name}
@@ -224,8 +251,10 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
               <span
                 className={`px-4 py-1 rounded-full text-sm font-semibold border ${
                   status === "active"
-                    ? "bg-green-900 text-green-200"
-                    : "bg-red-900 text-red-200"
+                    ? "bg-green-900 text-green-200 border-green-700"
+                    : status === "inactive"
+                    ? "bg-red-600 text-white border-red-400"
+                    : "bg-red-900 text-red-200 border-red-700"
                 }`}
               >
                 {status.toUpperCase()}
@@ -424,7 +453,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
         </div>
       </div>
 
-      {/* FORM 1: EDIT BASIC MEMBER INFO */}
+      {/* MODALS */}
       {isMemberModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-orange-500 rounded-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -603,7 +632,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
         </div>
       )}
 
-      {/* FORM 2: EDIT LATEST HISTORY */}
       {isHistoryModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-orange-500 rounded-xl max-w-md w-full p-6 shadow-2xl">
