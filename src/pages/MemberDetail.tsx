@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   UserMinus,
   UserPlus,
+  User,
 } from "lucide-react";
 
 interface Membership {
@@ -30,6 +31,7 @@ interface Member {
   blood_group: string;
   contact_number: string;
   address: string;
+  photo : string;
   occupation?: string;
   alcoholic?: boolean;
   smoking_habit?: boolean;
@@ -82,6 +84,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     }
   }, [member]);
 
+
   useEffect(() => {
     if (historyForm.start_date && historyForm.no_of_months > 0) {
       const startDate = new Date(historyForm.start_date);
@@ -94,6 +97,12 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
       }
     }
   }, [historyForm.start_date, historyForm.no_of_months]);
+  const getPhotoUrl = (photo?: string | null) => {
+    if (!photo) return null;
+    if (photo.startsWith("http")) return photo;
+
+    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/member-photos/${photo}`;
+  };
 
   const fetchMember = async () => {
     setLoading(true);
@@ -216,6 +225,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
           <ArrowLeft className="h-4 w-4" />
           <span>Back</span>
         </button>
+        
 
         <div className="bg-slate-800 rounded-xl shadow-2xl overflow-hidden border border-orange-500/30 relative">
           {/* TOP ACTIONS - FIXED VISIBILITY */}
@@ -231,6 +241,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 <UserMinus className="h-5 w-5" />
               )}
             </button>
+            
             <button
               onClick={() => setIsMemberModalOpen(true)}
               className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all border border-white/10"
@@ -240,14 +251,30 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
           </div>
 
           {/* Header Section */}
+         
           <div className="bg-gradient-to-r from-orange-600 to-red-700 px-8 py-6">
+            <span>
+            <div className="w-10 h-10 rounded-full bg-orange-500/20 overflow-hidden flex items-center justify-center">
+                        {member.photo ? (
+                          <img
+                            src={getPhotoUrl(member.photo)}
+                            alt={member.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User className="text-orange-500" size={20} />
+                        )}
+                      </div>
+            
             <h1 className="text-4xl font-bold text-white mb-2">
               {member.name}
             </h1>
+            </span>
             <div className="flex items-center space-x-4">
               <span className="text-yellow-200 text-lg">
                 ID: {member.member_no}
               </span>
+              
               <span
                 className={`px-4 py-1 rounded-full text-sm font-semibold border ${
                   status === "active"
