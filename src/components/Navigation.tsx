@@ -1,10 +1,10 @@
-import { Dumbbell } from "lucide-react";
+import logo from "../img/logo.png";
 
 // FIX: Updated interface to include all possible page types
 interface NavigationProps {
   currentPage: "add" | "view" | "detail" | "payments";
   onNavigate: (page: "add" | "view" | "detail" | "payments") => void;
-  memberId?: string; // Added to match the prop being passed in App.tsx
+  memberId?: string;
 }
 
 export function Navigation({ currentPage, onNavigate }: NavigationProps) {
@@ -12,10 +12,18 @@ export function Navigation({ currentPage, onNavigate }: NavigationProps) {
     <nav className="bg-slate-800 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-2">
-            <Dumbbell className="h-8 w-8 text-orange-500" />
-            <span className="text-xl font-bold">Kavifit Gym Manager</span>
+          
+          {/* LOGO + TITLE */}
+          <div className="flex items-center space-x-3">
+            <img
+              src={logo}
+              alt="Kavifit Logo"
+              className="h-9 w-9 rounded-full object-contain border border-orange-500"
+            />
+            <span className="text-xl font-bold">Kavifit Gym Management</span>
           </div>
+
+          {/* NAV BUTTONS */}
           <div className="flex space-x-4">
             <button
               onClick={() => onNavigate("add")}
@@ -27,6 +35,7 @@ export function Navigation({ currentPage, onNavigate }: NavigationProps) {
             >
               Add Member
             </button>
+
             <button
               onClick={() => onNavigate("view")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
@@ -37,6 +46,7 @@ export function Navigation({ currentPage, onNavigate }: NavigationProps) {
             >
               View Members
             </button>
+
             <button
               onClick={() => onNavigate("payments")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${

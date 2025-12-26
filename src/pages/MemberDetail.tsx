@@ -740,7 +740,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
               >
-                Update Latest Record
+                Update User
               </button>
             </form>
           </div>
