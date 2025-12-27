@@ -47,15 +47,16 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMemberForEdit, setSelectedMemberForEdit] =
-    useState<Member | null>(null);
-  const [formData, setFormData] = useState({
-    package: "",
-    no_of_months: 1,
-    start_date: new Date().toISOString().split("T")[0],
-    end_date: "",
-    amount_paid: 0,
-    balance_amount: 0,
-  });
+  useState<Member | null>(null);
+const [formData, setFormData] = useState({
+  package: "",
+  no_of_months: 1,
+  start_date: new Date().toISOString().split("T")[0],
+  end_date: "",
+  amount_paid: 0,
+  balance_amount: 0,
+});
+
 
   useEffect(() => {
     fetchMembers();
@@ -146,7 +147,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
     if (!error) {
       setIsModalOpen(false);
       fetchMembers();
-      alert("Membership Record Updated!");
+      alert("Membership Updated!");
     }
   };
 
@@ -334,7 +335,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                           <UserMinus size={20} />
                         </button>
                       )}
-                      <button
+                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedMemberForEdit(member);
@@ -363,6 +364,149 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
           </div>
         )}
       </div>
+      {isModalOpen && selectedMemberForEdit && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-orange-500 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-orange-500">
+                Update Membership
+              </h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                <X />
+              </button>
+            </div>
+
+            <form onSubmit={handleRenew} className="space-y-4">
+              {/* FREEZED FIELDS (Read Only) */}
+              <div className="grid grid-cols-2 gap-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
+                <div>
+                  <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
+                    Member Name
+                  </label>
+                  <div className="text-white font-semibold truncate">
+                    {selectedMemberForEdit.name}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
+                    Admission No
+                  </label>
+                  <div className="text-white font-semibold">
+                    {selectedMemberForEdit.member_no}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                  Package Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 1 Month Premium"
+                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-orange-500"
+                  onChange={(e) =>
+                    setFormData({ ...formData, package: e.target.value })
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Months
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.no_of_months}
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        no_of_months: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Amount Paid
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        amount_paid: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.start_date}
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
+                    onChange={(e) =>
+                      setFormData({ ...formData, start_date: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    End Date (Auto)
+                  </label>
+                  <input
+                    type="date"
+                    readOnly
+                    value={formData.end_date}
+                    className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-orange-400 cursor-default"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                  Balance Due
+                </label>
+                <input
+                  type="number"
+                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-red-400"
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      balance_amount: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full bg-orange-500 hover:bg-orange-600 font-bold py-3 rounded-lg mt-4 transition-colors"
+              >
+                {selectedMemberForEdit.is_inactive
+                  ? "Reactivate & Add Record"
+                  : "Add Membership Record"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
 
       {/* RENEW MODAL */}
       {isModalOpen && selectedMemberForEdit && (
