@@ -363,7 +363,12 @@ export function AddMember() {
                   <option value="">Select package</option>
                   <option>1 month</option>
                   <option>3 month</option>
-                  <option>1 year</option>
+                  <option>3+1 month</option>
+                  <option>6 month</option>
+                  <option>6+1 month</option>
+                  <option>12 month</option>
+                  <option>Personal Training</option>
+              
                 </select>
               </div>
               <div>

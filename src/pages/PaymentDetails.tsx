@@ -169,7 +169,7 @@ export function Payments() {
   };
 
   const openWhatsApp = (phone: string, name: string, balance: number) => {
-    const msg = `Hi ${name}, this is Kavifit Gym. Friendly reminder regarding your pending balance of ₹${balance}. Thank you!`;
+    const msg = `Hi ${name},Friendly reminder regarding your pending balance of ₹${balance}. \nThank you! \n Kavifit Gym.`;
     window.open(
       `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`,
       "_blank"

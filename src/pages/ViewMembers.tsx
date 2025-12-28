@@ -349,7 +349,9 @@ const [formData, setFormData] = useState({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`https://wa.me/${member.contact_number}`);
+                          const message = 'Hello ' + member.name + ', we wanted to remind you that your gym membership is set to expire soon . Please contact us to renew and continue enjoying our facilities! \nThank you! \nKavifit Gym.';
+                          const encoded = encodeURIComponent(message);
+                          window.open(`https://wa.me/${member.contact_number}?text=${encoded}`);
                         }}
                         className="p-2 text-green-400 hover:bg-green-900/20 rounded transition-colors"
                         title="WhatsApp"
