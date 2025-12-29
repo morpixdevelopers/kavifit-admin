@@ -61,7 +61,6 @@ export function Payments() {
     ).toISOString();
 
     try {
-      // 1. Global Totals - UPDATED TO FILTER ONLY ACTIVE MEMBERS
       const { count: activeMemberCount } = await supabase
         .from("members")
         .select("*", { count: "exact", head: true })
@@ -74,7 +73,6 @@ export function Payments() {
       const allTimeTotal =
         allEarnings?.reduce((sum, m) => sum + Number(m.amount_paid), 0) || 0;
 
-      // 2. Monthly Filtered Memberships
       const { data: memberships, error } = await supabase
         .from("memberships")
         .select(
@@ -84,12 +82,14 @@ export function Payments() {
           total_amount, 
           member_id, 
           created_at,
+          start_date,
+          payment_method,
           members (name, contact_number)
         `
         )
-        .gte("created_at", start)
-        .lte("created_at", end)
-        .order("created_at", { ascending: true });
+        .gte("start_date", start)
+        .lte("start_date", end)
+        .order("start_date", { ascending: true });
 
       if (error) throw error;
 
@@ -118,7 +118,7 @@ export function Payments() {
             .from("memberships")
             .select("*", { count: "exact", head: true })
             .eq("member_id", m.member_id)
-            .lt("created_at", m.created_at);
+            .lt("start_date", m.start_date);
 
           if ((count && count > 0) || seenInThisBatch.has(m.member_id)) {
             renewCount++;
@@ -169,7 +169,7 @@ export function Payments() {
   };
 
   const openWhatsApp = (phone: string, name: string, balance: number) => {
-    const msg = `Hi ${name},Friendly reminder regarding your pending balance of ₹${balance}. \nThank you! \n Kavifit Gym.`;
+    const msg = `Hi ${name}, Friendly reminder regarding your pending balance of ₹${balance}. \nThank you! \n Kavifit Gym.`;
     window.open(
       `https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`,
       "_blank"
@@ -335,6 +335,7 @@ export function Payments() {
                     <thead>
                       <tr className="text-slate-500 text-[10px] uppercase tracking-[0.3em] border-b border-slate-700">
                         <th className="px-6 py-5">Member Details</th>
+                        <th className="px-6 py-5 text-center">Method</th>
                         <th className="px-6 py-5 text-center">Paid</th>
                         <th className="px-6 py-5 text-center">
                           {listTab === "pending" ? "Balance" : "Total"}
@@ -360,6 +361,11 @@ export function Payments() {
                             <p className="text-xs text-slate-500 font-mono mt-1">
                               {m.members?.contact_number}
                             </p>
+                          </td>
+                          <td className="px-6 py-6 text-center">
+                            <span className="bg-slate-700 text-slate-300 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                              {m.payment_method || "N/A"}
+                            </span>
                           </td>
                           <td className="px-6 py-6 text-center text-slate-300 font-medium">
                             ₹{m.amount_paid}

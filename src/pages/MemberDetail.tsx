@@ -19,6 +19,7 @@ interface Membership {
   end_date: string;
   amount_paid: number;
   total_amount: number;
+  payment_method: string;
 }
 
 interface Member {
@@ -31,7 +32,7 @@ interface Member {
   blood_group: string;
   contact_number: string;
   address: string;
-  photo : string;
+  photo: string;
   occupation?: string;
   alcoholic?: boolean;
   smoking_habit?: boolean;
@@ -54,13 +55,17 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   const [memberForm, setMemberForm] = useState<Partial<Member>>({});
+
+  // Changed types to string | number to handle empty input erasing
   const [historyForm, setHistoryForm] = useState({
     package: "",
     no_of_months: 0,
     start_date: "",
     end_date: "",
-    amount_paid: 0,
-    balance_amount: 0,
+    amount_paid: "" as string | number,
+    balance_amount: "" as string | number,
+    total_amount: 0, // Store total to keep calculations consistent
+    payment_method: "Cash",
   });
 
   useEffect(() => {
@@ -84,7 +89,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     }
   }, [member]);
 
-
   useEffect(() => {
     if (historyForm.start_date && historyForm.no_of_months > 0) {
       const startDate = new Date(historyForm.start_date);
@@ -97,11 +101,14 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
       }
     }
   }, [historyForm.start_date, historyForm.no_of_months]);
+
   const getPhotoUrl = (photo?: string | null) => {
-    if (!photo) return null;
+    if (!photo) return undefined;
     if (photo.startsWith("http")) return photo;
 
-    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/member-photos/${photo}`;
+    return `${
+      import.meta.env.VITE_SUPABASE_URL
+    }/storage/v1/object/public/member-photos/${photo}`;
   };
 
   const fetchMember = async () => {
@@ -163,6 +170,8 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
       balance_amount:
         Number(latestMembership.total_amount) -
         Number(latestMembership.amount_paid),
+      total_amount: Number(latestMembership.total_amount),
+      payment_method: latestMembership.payment_method || "Cash",
     });
     setIsHistoryModalOpen(true);
   };
@@ -170,8 +179,11 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
   const handleUpdateHistory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!latestMembership) return;
-    const total =
-      Number(historyForm.amount_paid) + Number(historyForm.balance_amount);
+
+    const paid = Number(historyForm.amount_paid) || 0;
+    const balance = Number(historyForm.balance_amount) || 0;
+    const total = paid + balance;
+
     const { error } = await supabase
       .from("memberships")
       .update({
@@ -179,8 +191,9 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
         no_of_months: historyForm.no_of_months,
         start_date: historyForm.start_date,
         end_date: historyForm.end_date,
-        amount_paid: historyForm.amount_paid,
+        amount_paid: paid,
         total_amount: total,
+        payment_method: historyForm.payment_method,
       })
       .eq("id", latestMembership.id);
 
@@ -215,6 +228,10 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
     status = days >= 7 ? "active" : days >= 0 ? "expiring" : "expired";
   }
 
+  // Common class to hide number arrows
+  const hideArrowsClass =
+    "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
   return (
     <div className="min-h-screen bg-slate-900 py-8 px-4 font-sans text-white">
       <div className="max-w-4xl mx-auto">
@@ -225,10 +242,8 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
           <ArrowLeft className="h-4 w-4" />
           <span>Back</span>
         </button>
-        
 
         <div className="bg-slate-800 rounded-xl shadow-2xl overflow-hidden border border-orange-500/30 relative">
-          {/* TOP ACTIONS - FIXED VISIBILITY */}
           <div className="absolute top-6 right-6 flex items-center space-x-2">
             <button
               onClick={toggleInactivate}
@@ -241,7 +256,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 <UserMinus className="h-5 w-5" />
               )}
             </button>
-            
+
             <button
               onClick={() => setIsMemberModalOpen(true)}
               className="p-2 rounded-full bg-white/20 text-white hover:bg-white/30 transition-all border border-white/10"
@@ -250,31 +265,27 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
             </button>
           </div>
 
-          {/* Header Section */}
-         
           <div className="bg-gradient-to-r from-orange-600 to-red-700 px-8 py-6">
-            <span>
-            <div className="w-10 h-10 rounded-full bg-orange-500/20 overflow-hidden flex items-center justify-center">
-                        {member.photo ? (
-                          <img
-                            src={getPhotoUrl(member.photo)}
-                            alt={member.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <User className="text-orange-500" size={20} />
-                        )}
-                      </div>
-            
-            <h1 className="text-4xl font-bold text-white mb-2">
-              {member.name}
-            </h1>
-            </span>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-16 h-16 rounded-full bg-white/20 overflow-hidden flex items-center justify-center border-2 border-white/30">
+                {member.photo ? (
+                  <img
+                    src={getPhotoUrl(member.photo)}
+                    alt={member.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="text-white" size={32} />
+                )}
+              </div>
+              <h1 className="text-4xl font-bold text-white">{member.name}</h1>
+            </div>
+
             <div className="flex items-center space-x-4">
               <span className="text-yellow-200 text-lg">
                 ID: {member.member_no}
               </span>
-              
+
               <span
                 className={`px-4 py-1 rounded-full text-sm font-semibold border ${
                   status === "active"
@@ -443,6 +454,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                       <th className="px-4 py-3">Months</th>
                       <th className="px-4 py-3">Renew Date</th>
                       <th className="px-4 py-3">Due Date</th>
+                      <th className="px-4 py-3">Method</th>
                       <th className="px-4 py-3">Paid</th>
                       <th className="px-4 py-3">Balance</th>
                     </tr>
@@ -465,6 +477,11 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                         </td>
                         <td className="px-4 py-4">
                           {new Date(m.end_date).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="px-2 py-0.5 bg-slate-800 rounded text-xs border border-slate-600">
+                            {m.payment_method || "Cash"}
+                          </span>
                         </td>
                         <td className="px-4 py-4">₹{m.amount_paid}</td>
                         <td className="px-4 py-4 text-red-400 font-medium">
@@ -544,12 +561,12 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 </label>
                 <input
                   type="number"
-                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
-                  value={memberForm.age || 0}
+                  className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-white ${hideArrowsClass}`}
+                  value={memberForm.age || ""}
                   onChange={(e) =>
                     setMemberForm({
                       ...memberForm,
-                      age: parseInt(e.target.value),
+                      age: e.target.value === "" ? 0 : parseInt(e.target.value),
                     })
                   }
                 />
@@ -560,12 +577,13 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 </label>
                 <input
                   type="number"
-                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
-                  value={memberForm.height || 0}
+                  className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-white ${hideArrowsClass}`}
+                  value={memberForm.height || ""}
                   onChange={(e) =>
                     setMemberForm({
                       ...memberForm,
-                      height: parseFloat(e.target.value),
+                      height:
+                        e.target.value === "" ? 0 : parseFloat(e.target.value),
                     })
                   }
                 />
@@ -576,12 +594,13 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 </label>
                 <input
                   type="number"
-                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
-                  value={memberForm.weight || 0}
+                  className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-white ${hideArrowsClass}`}
+                  value={memberForm.weight || ""}
                   onChange={(e) =>
                     setMemberForm({
                       ...memberForm,
-                      weight: parseFloat(e.target.value),
+                      weight:
+                        e.target.value === "" ? 0 : parseFloat(e.target.value),
                     })
                   }
                 />
@@ -677,13 +696,34 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 </label>
                 <input
                   type="text"
-                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
+                  readOnly
+                  className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
                   value={historyForm.package}
-                  onChange={(e) =>
-                    setHistoryForm({ ...historyForm, package: e.target.value })
-                  }
                 />
               </div>
+
+              <div className="space-y-1">
+                <label className="text-xs text-gray-400 font-bold uppercase">
+                  Payment Method
+                </label>
+                <select
+                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
+                  value={historyForm.payment_method}
+                  onChange={(e) =>
+                    setHistoryForm({
+                      ...historyForm,
+                      payment_method: e.target.value,
+                    })
+                  }
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="GPay">GPay</option>
+                  <option value="PhonePe">PhonePe</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Card">Card</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs text-gray-400 font-bold uppercase">
@@ -691,33 +731,24 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="number"
-                    className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
+                    readOnly
+                    className={`w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed ${hideArrowsClass}`}
                     value={historyForm.no_of_months}
-                    onChange={(e) =>
-                      setHistoryForm({
-                        ...historyForm,
-                        no_of_months: parseInt(e.target.value) || 0,
-                      })
-                    }
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-gray-400 font-bold uppercase">
-                    Paid (₹)
+                    Total Amount (₹)
                   </label>
                   <input
                     type="number"
-                    className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-green-400"
-                    value={historyForm.amount_paid}
-                    onChange={(e) =>
-                      setHistoryForm({
-                        ...historyForm,
-                        amount_paid: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                    readOnly
+                    className={`w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-green-500 font-bold cursor-not-allowed ${hideArrowsClass}`}
+                    value={historyForm.total_amount}
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs text-gray-400 font-bold uppercase">
@@ -725,14 +756,9 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="date"
-                    className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
+                    readOnly
+                    className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
                     value={historyForm.start_date}
-                    onChange={(e) =>
-                      setHistoryForm({
-                        ...historyForm,
-                        start_date: e.target.value,
-                      })
-                    }
                   />
                 </div>
                 <div className="space-y-1">
@@ -742,32 +768,68 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   <input
                     type="date"
                     readOnly
-                    className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-white cursor-not-allowed opacity-80"
+                    className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
                     value={historyForm.end_date}
                   />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs text-gray-400 font-bold uppercase text-red-400">
-                  Balance Amount (₹)
-                </label>
-                <input
-                  type="number"
-                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-red-400 font-bold"
-                  value={historyForm.balance_amount}
-                  onChange={(e) =>
-                    setHistoryForm({
-                      ...historyForm,
-                      balance_amount: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-400 font-bold uppercase">
+                    Paid (₹)
+                  </label>
+                  <input
+                    type="number"
+                    className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-green-400 ${hideArrowsClass}`}
+                    value={historyForm.amount_paid}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const paidNum = val === "" ? "" : parseFloat(val);
+                      const balance =
+                        val === ""
+                          ? historyForm.total_amount
+                          : historyForm.total_amount - Number(paidNum);
+
+                      setHistoryForm({
+                        ...historyForm,
+                        amount_paid: paidNum,
+                        balance_amount: balance,
+                      });
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-400 font-bold uppercase text-red-400">
+                    Balance Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-red-400 font-bold ${hideArrowsClass}`}
+                    value={historyForm.balance_amount}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const balanceNum = val === "" ? "" : parseFloat(val);
+                      const paid =
+                        val === ""
+                          ? historyForm.total_amount
+                          : historyForm.total_amount - Number(balanceNum);
+
+                      setHistoryForm({
+                        ...historyForm,
+                        balance_amount: balanceNum,
+                        amount_paid: paid,
+                      });
+                    }}
+                  />
+                </div>
               </div>
+
               <button
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
               >
-                Update User
+                Update Membership History
               </button>
             </form>
           </div>

@@ -15,6 +15,7 @@ export function AddMember() {
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [contactNumber, setContactNumber] = useState<string>("");
+  const [paymentMethod, setPaymentMethod] = useState<string>("Cash");
 
   // Health Habits States
   const [alcoholic, setAlcoholic] = useState<boolean>(false);
@@ -100,6 +101,7 @@ export function AddMember() {
         end_date: end.toISOString().split("T")[0],
         total_amount: totalAmount,
         amount_paid: amountPaid,
+        payment_method: paymentMethod, // Added this field
       });
 
     if (membershipError) {
@@ -114,6 +116,7 @@ export function AddMember() {
       setAlcoholic(false);
       setSmokingHabit(false);
       setTeetotaler(false);
+      setPaymentMethod("Cash");
     }
     setIsSubmitting(false);
   };
@@ -370,7 +373,6 @@ export function AddMember() {
                   <option>12+3 month</option>
                   <option>12+6 month</option>
                   <option>Personal Training</option>
-              
                 </select>
               </div>
               <div>
@@ -393,14 +395,49 @@ export function AddMember() {
                   className={input}
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className={label}>Balance Amount (₹)</label>
-                <input
-                  type="number"
-                  readOnly
-                  value={balanceDue}
-                  className={`${input} bg-[#2d3a4d] border-slate-700 text-slate-400 cursor-not-allowed`}
-                />
+
+              {/* BALANCE AND PAYMENT METHOD ROW */}
+              <div className="flex flex-col md:flex-row gap-6 md:col-span-2">
+                <div className="flex-1">
+                  <label className={label}>Balance Amount (₹)</label>
+                  <input
+                    type="number"
+                    readOnly
+                    value={balanceDue}
+                    className={`${input} bg-[#2d3a4d] border-slate-700 text-slate-400 cursor-not-allowed`}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className={label}>Payment Method</label>
+                  <div className="flex items-center h-[42px] gap-6 bg-[#334155]/30 px-4 rounded-lg border border-[#2f4050]">
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="Cash"
+                        checked={paymentMethod === "Cash"}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-4 h-4 text-orange-500 focus:ring-orange-500 bg-[#334155] border-[#2f4050]"
+                      />
+                      <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
+                        Cash
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="GPay"
+                        checked={paymentMethod === "GPay"}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-4 h-4 text-orange-500 focus:ring-orange-500 bg-[#334155] border-[#2f4050]"
+                      />
+                      <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">
+                        GPay
+                      </span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </section>

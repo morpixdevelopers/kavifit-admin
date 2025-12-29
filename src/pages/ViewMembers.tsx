@@ -31,7 +31,7 @@ interface Member {
   created_at: string;
   memberships: Membership[];
   is_inactive?: boolean;
-  photo?: string | null; // ✅ ADDED
+  photo?: string | null;
 }
 
 interface ViewMembersProps {
@@ -47,16 +47,16 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMemberForEdit, setSelectedMemberForEdit] =
-  useState<Member | null>(null);
-const [formData, setFormData] = useState({
-  package: "",
-  no_of_months: 1,
-  start_date: new Date().toISOString().split("T")[0],
-  end_date: "",
-  amount_paid: 0,
-  balance_amount: 0,
-});
-
+    useState<Member | null>(null);
+  const [formData, setFormData] = useState({
+    package: "",
+    no_of_months: 1,
+    start_date: new Date().toISOString().split("T")[0],
+    end_date: "",
+    total_amount: 0,
+    amount_paid: 0,
+    balance_amount: 0,
+  });
 
   useEffect(() => {
     fetchMembers();
@@ -75,11 +75,13 @@ const [formData, setFormData] = useState({
     }
   }, [formData.start_date, formData.no_of_months]);
 
-  const getPhotoUrl = (photo?: string | null) => {
-    if (!photo) return null;
+  const getPhotoUrl = (photo?: string | null): string | undefined => {
+    if (!photo) return undefined;
     if (photo.startsWith("http")) return photo;
 
-    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/member-photos/${photo}`;
+    return `${
+      import.meta.env.VITE_SUPABASE_URL
+    }/storage/v1/object/public/member-photos/${photo}`;
   };
 
   const fetchMembers = async () => {
@@ -130,8 +132,6 @@ const [formData, setFormData] = useState({
         .eq("id", selectedMemberForEdit.id);
     }
 
-    const totalAmount =
-      Number(formData.amount_paid) + Number(formData.balance_amount);
     const { error } = await supabase.from("memberships").insert([
       {
         member_id: selectedMemberForEdit.id,
@@ -140,7 +140,7 @@ const [formData, setFormData] = useState({
         start_date: formData.start_date,
         end_date: formData.end_date,
         amount_paid: formData.amount_paid,
-        total_amount: totalAmount,
+        total_amount: formData.total_amount,
       },
     ]);
 
@@ -183,8 +183,7 @@ const [formData, setFormData] = useState({
     all: members.length,
     active: members.filter(
       (m) =>
-        !m.is_inactive &&
-        getMemberStatus(getLatest(m.memberships)) === "active"
+        !m.is_inactive && getMemberStatus(getLatest(m.memberships)) === "active"
     ).length,
     expiring: members.filter(
       (m) =>
@@ -220,26 +219,26 @@ const [formData, setFormData] = useState({
 
       {/* Filter Tabs */}
       <div className="mb-6 flex flex-wrap gap-3">
-        {(['all', 'active', 'expiring', 'expired'] as FilterType[]).map(f => (
+        {(["all", "active", "expiring", "expired"] as FilterType[]).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
             className={`px-6 py-2 rounded-lg font-semibold transition-all ${
               filter === f
-                ? f === 'all'
-                  ? 'bg-gray-400 text-black'
-                  : f === 'active'
-                  ? 'bg-green-500 text-white'
-                  : f === 'expiring'
-                  ? 'bg-yellow-500 text-black'
-                  : 'bg-red-500 text-white'
-                : f === 'active'
-                ? 'bg-green-900/30 text-green-300 border border-green-500/50'
-                : f === 'expiring'
-                ? 'bg-yellow-900/30 text-yellow-300 border border-yellow-500/50'
-                : f === 'expired'
-                ? 'bg-red-900/30 text-red-300 border border-red-500/50'
-                : 'bg-gray-700 text-gray-300'
+                ? f === "all"
+                  ? "bg-gray-400 text-black"
+                  : f === "active"
+                  ? "bg-green-500 text-white"
+                  : f === "expiring"
+                  ? "bg-yellow-500 text-black"
+                  : "bg-red-500 text-white"
+                : f === "active"
+                ? "bg-green-900/30 text-green-300 border border-green-500/50"
+                : f === "expiring"
+                ? "bg-yellow-900/30 text-yellow-300 border border-yellow-500/50"
+                : f === "expired"
+                ? "bg-red-900/30 text-red-300 border border-red-500/50"
+                : "bg-gray-700 text-gray-300"
             }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
@@ -270,7 +269,6 @@ const [formData, setFormData] = useState({
                 >
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-4">
-                      {/* ✅ ONLY THIS BLOCK CHANGED */}
                       <div className="w-10 h-10 rounded-full bg-orange-500/20 overflow-hidden flex items-center justify-center">
                         {member.photo ? (
                           <img
@@ -297,31 +295,45 @@ const [formData, setFormData] = useState({
                           )}
                         </div>
                         <div className="space-y-1 text-sm">
-                        <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">ID:</span> {member.member_no}
-                        </p>
-                        <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">Package:</span>{' '}
-                          {latest?.package || 'N/A'}
-                        </p>
-                        <p className="text-gray-400">
-                          <span className="text-orange-500 font-medium">Joined:</span>{' '}
-                          {latest ? new Date(latest.start_date).toLocaleDateString() : 'N/A'}
-                        </p>
-                        <p className={`font-medium ${
-                          daysLeft === null
-                            ? 'text-gray-300'
-                            : daysLeft < 0
-                            ? 'text-red-500'
-                            : daysLeft <= 7
-                            ? 'text-yellow-400'
-                            : 'text-green-400'
-                        }`}>
-                          <span className="text-gray-400">Expires:</span>{' '}
-                          {daysLeft === null ? 'N/A' : daysLeft < 0 ? 'Expired' : `${daysLeft} days left`}
-                        </p>
-                      </div>
-                    
+                          <p className="text-gray-400">
+                            <span className="text-orange-500 font-medium">
+                              ID:
+                            </span>{" "}
+                            {member.member_no}
+                          </p>
+                          <p className="text-gray-400">
+                            <span className="text-orange-500 font-medium">
+                              Package:
+                            </span>{" "}
+                            {latest?.package || "N/A"}
+                          </p>
+                          <p className="text-gray-400">
+                            <span className="text-orange-500 font-medium">
+                              Joined:
+                            </span>{" "}
+                            {latest
+                              ? new Date(latest.start_date).toLocaleDateString()
+                              : "N/A"}
+                          </p>
+                          <p
+                            className={`font-medium ${
+                              daysLeft === null
+                                ? "text-gray-300"
+                                : daysLeft < 0
+                                ? "text-red-500"
+                                : daysLeft <= 7
+                                ? "text-yellow-400"
+                                : "text-green-400"
+                            }`}
+                          >
+                            <span className="text-gray-400">Expires:</span>{" "}
+                            {daysLeft === null
+                              ? "N/A"
+                              : daysLeft < 0
+                              ? "Expired"
+                              : `${daysLeft} days left`}
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -335,7 +347,7 @@ const [formData, setFormData] = useState({
                           <UserMinus size={20} />
                         </button>
                       )}
-                       <button
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedMemberForEdit(member);
@@ -349,9 +361,14 @@ const [formData, setFormData] = useState({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          const message = 'Hello ' + member.name + ', we wanted to remind you that your gym membership is set to expire soon . Please contact us to renew and continue enjoying our facilities! \nThank you! \nKavifit Gym.';
+                          const message =
+                            "Hello " +
+                            member.name +
+                            ", we wanted to remind you that your gym membership is set to expire soon . Please contact us to renew and continue enjoying our facilities! \nThank you! \nKavifit Gym.";
                           const encoded = encodeURIComponent(message);
-                          window.open(`https://wa.me/${member.contact_number}?text=${encoded}`);
+                          window.open(
+                            `https://wa.me/${member.contact_number}?text=${encoded}`
+                          );
                         }}
                         className="p-2 text-green-400 hover:bg-green-900/20 rounded transition-colors"
                         title="WhatsApp"
@@ -366,9 +383,22 @@ const [formData, setFormData] = useState({
           </div>
         )}
       </div>
+
       {isModalOpen && selectedMemberForEdit && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
           <div className="bg-slate-800 border border-orange-500 rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <style>
+              {`
+                input[type="number"]::-webkit-inner-spin-button,
+                input[type="number"]::-webkit-outer-spin-button {
+                  -webkit-appearance: none;
+                  margin: 0;
+                }
+                input[type="number"] {
+                  -moz-appearance: textfield;
+                }
+              `}
+            </style>
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold text-orange-500">
                 Update Membership
@@ -382,7 +412,6 @@ const [formData, setFormData] = useState({
             </div>
 
             <form onSubmit={handleRenew} className="space-y-4">
-              {/* FREEZED FIELDS (Read Only) */}
               <div className="grid grid-cols-2 gap-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
                 <div>
                   <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
@@ -406,15 +435,26 @@ const [formData, setFormData] = useState({
                 <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
                   Package Name
                 </label>
-                <input
-                  type="text"
+                <select
+                  name="package"
                   required
-                  placeholder="e.g. 1 Month Premium"
+                  value={formData.package}
                   className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none focus:border-orange-500"
                   onChange={(e) =>
                     setFormData({ ...formData, package: e.target.value })
                   }
-                />
+                >
+                  <option value="">Select package</option>
+                  <option>1 month</option>
+                  <option>3 month</option>
+                  <option>3+1 month</option>
+                  <option>6 month</option>
+                  <option>6+1 month</option>
+                  <option>12 month</option>
+                  <option>12+3 month</option>
+                  <option>12+6 month</option>
+                  <option>Personal Training</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -425,8 +465,11 @@ const [formData, setFormData] = useState({
                   <input
                     type="number"
                     min="1"
-                    value={formData.no_of_months}
+                    value={formData.no_of_months || ""}
                     className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
+                    onFocus={(e) =>
+                      e.target.value === "0" && (e.target.value = "")
+                    }
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -437,18 +480,24 @@ const [formData, setFormData] = useState({
                 </div>
                 <div>
                   <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
-                    Amount Paid
+                    Total Amount
                   </label>
                   <input
                     type="number"
                     required
+                    value={formData.total_amount || ""}
                     className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
-                    onChange={(e) =>
+                    onFocus={(e) =>
+                      e.target.value === "0" && (e.target.value = "")
+                    }
+                    onChange={(e) => {
+                      const total = parseFloat(e.target.value) || 0;
                       setFormData({
                         ...formData,
-                        amount_paid: parseFloat(e.target.value) || 0,
-                      })
-                    }
+                        total_amount: total,
+                        balance_amount: total - formData.amount_paid,
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -480,20 +529,49 @@ const [formData, setFormData] = useState({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
-                  Balance Due
-                </label>
-                <input
-                  type="number"
-                  className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-red-400"
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      balance_amount: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Amount Paid
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.amount_paid || ""}
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-green-400"
+                    onFocus={(e) =>
+                      e.target.value === "0" && (e.target.value = "")
+                    }
+                    onChange={(e) => {
+                      const paid = parseFloat(e.target.value) || 0;
+                      setFormData({
+                        ...formData,
+                        amount_paid: paid,
+                        balance_amount: formData.total_amount - paid,
+                      });
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 uppercase mb-1 font-bold">
+                    Balance Due
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.balance_amount || ""}
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-red-400"
+                    onFocus={(e) =>
+                      e.target.value === "0" && (e.target.value = "")
+                    }
+                    onChange={(e) => {
+                      const balance = parseFloat(e.target.value) || 0;
+                      setFormData({
+                        ...formData,
+                        balance_amount: balance,
+                        amount_paid: formData.total_amount - balance,
+                      });
+                    }}
+                  />
+                </div>
               </div>
 
               <button
@@ -507,13 +585,6 @@ const [formData, setFormData] = useState({
             </form>
           </div>
         </div>
-      )}
-
-
-      {/* RENEW MODAL */}
-      {isModalOpen && selectedMemberForEdit && (
-        /* unchanged modal code */
-        null
       )}
     </div>
   );
