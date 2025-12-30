@@ -368,7 +368,7 @@ export function AddMember() {
                   <option>3 month</option>
                   <option>3+1 month</option>
                   <option>6 month</option>
-                  <option>6+1 month</option>
+                  <option>6+3 month</option>
                   <option>12 month</option>
                   <option>12+3 month</option>
                   <option>12+6 month</option>
