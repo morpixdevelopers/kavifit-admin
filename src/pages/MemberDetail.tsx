@@ -696,7 +696,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 </label>
                 <input
                   type="text"
-                  readOnly
                   className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
                   value={historyForm.package}
                 />
@@ -731,7 +730,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="number"
-                    readOnly
                     className={`w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed ${hideArrowsClass}`}
                     value={historyForm.no_of_months}
                   />
@@ -742,7 +740,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="number"
-                    readOnly
                     className={`w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-green-500 font-bold cursor-not-allowed ${hideArrowsClass}`}
                     value={historyForm.total_amount}
                   />
@@ -756,7 +753,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="date"
-                    readOnly
                     className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
                     value={historyForm.start_date}
                   />
@@ -767,7 +763,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="date"
-                    readOnly
                     className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
                     value={historyForm.end_date}
                   />
