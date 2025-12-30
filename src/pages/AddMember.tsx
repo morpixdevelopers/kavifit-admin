@@ -353,7 +353,7 @@ export function AddMember() {
                 <label className={label}>Duration</label>
                 <select name="no_of_months" required className={input}>
                   <option value="">Select duration</option>
-                  {[...Array(12)].map((_, i) => (
+                  {[...Array(20)].map((_, i) => (
                     <option key={i} value={i + 1}>
                       {i + 1} Month(s)
                     </option>
