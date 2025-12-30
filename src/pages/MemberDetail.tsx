@@ -694,11 +694,23 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 <label className="text-xs text-gray-400 font-bold uppercase">
                   Package
                 </label>
-                <input
-                  type="text"
-                  className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
+                <select
+                  className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
                   value={historyForm.package}
-                />
+                  onChange={(e) =>
+                    setHistoryForm({ ...historyForm, package: e.target.value })
+                  }
+                >
+                  <option value="1 month">1 month</option>
+                  <option value="3 month">3 month</option>
+                  <option value="3+1 month">3+1 month</option>
+                  <option value="6 month">6 month</option>
+                  <option value="6+3 month">6+3 month</option>
+                  <option value="12 month">12 month</option>
+                  <option value="12+3 month">12+3 month</option>
+                  <option value="12+6 month">12+6 month</option>
+                  <option value="Personal Training">Personal Training</option>
+                </select>
               </div>
 
               <div className="space-y-1">
@@ -717,9 +729,6 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                 >
                   <option value="Cash">Cash</option>
                   <option value="GPay">GPay</option>
-                  <option value="PhonePe">PhonePe</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="Card">Card</option>
                 </select>
               </div>
 
@@ -730,8 +739,19 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="number"
-                    className={`w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed ${hideArrowsClass}`}
-                    value={historyForm.no_of_months}
+                    className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-white ${hideArrowsClass}`}
+                    value={
+                      historyForm.no_of_months === 0
+                        ? ""
+                        : historyForm.no_of_months
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setHistoryForm({
+                        ...historyForm,
+                        no_of_months: val === "" ? 0 : parseInt(val),
+                      });
+                    }}
                   />
                 </div>
                 <div className="space-y-1">
@@ -740,8 +760,22 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="number"
-                    className={`w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-green-500 font-bold cursor-not-allowed ${hideArrowsClass}`}
-                    value={historyForm.total_amount}
+                    className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-green-500 font-bold ${hideArrowsClass}`}
+                    value={
+                      historyForm.total_amount === 0
+                        ? ""
+                        : historyForm.total_amount
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const newTotal = val === "" ? 0 : parseFloat(val);
+                      const currentPaid = Number(historyForm.amount_paid) || 0;
+                      setHistoryForm({
+                        ...historyForm,
+                        total_amount: newTotal,
+                        balance_amount: newTotal - currentPaid,
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -753,8 +787,14 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="date"
-                    className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
+                    className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
                     value={historyForm.start_date}
+                    onChange={(e) =>
+                      setHistoryForm({
+                        ...historyForm,
+                        start_date: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="space-y-1">
@@ -763,8 +803,14 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   </label>
                   <input
                     type="date"
-                    className="w-full bg-slate-700/50 p-2 rounded border border-slate-600 text-gray-400 cursor-not-allowed"
+                    className="w-full bg-slate-900 p-2 rounded border border-slate-700 text-white"
                     value={historyForm.end_date}
+                    onChange={(e) =>
+                      setHistoryForm({
+                        ...historyForm,
+                        end_date: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -777,19 +823,20 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   <input
                     type="number"
                     className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-green-400 ${hideArrowsClass}`}
-                    value={historyForm.amount_paid}
+                    value={
+                      historyForm.amount_paid === 0
+                        ? ""
+                        : historyForm.amount_paid
+                    }
                     onChange={(e) => {
                       const val = e.target.value;
-                      const paidNum = val === "" ? "" : parseFloat(val);
-                      const balance =
-                        val === ""
-                          ? historyForm.total_amount
-                          : historyForm.total_amount - Number(paidNum);
+                      const paidNum = val === "" ? 0 : parseFloat(val);
+                      const total = Number(historyForm.total_amount) || 0;
 
                       setHistoryForm({
                         ...historyForm,
-                        amount_paid: paidNum,
-                        balance_amount: balance,
+                        amount_paid: val === "" ? "" : paidNum, // Keep empty string if user cleared it
+                        balance_amount: total - paidNum,
                       });
                     }}
                   />
@@ -801,19 +848,20 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
                   <input
                     type="number"
                     className={`w-full bg-slate-900 p-2 rounded border border-slate-700 text-red-400 font-bold ${hideArrowsClass}`}
-                    value={historyForm.balance_amount}
+                    value={
+                      historyForm.balance_amount === 0
+                        ? ""
+                        : historyForm.balance_amount
+                    }
                     onChange={(e) => {
                       const val = e.target.value;
-                      const balanceNum = val === "" ? "" : parseFloat(val);
-                      const paid =
-                        val === ""
-                          ? historyForm.total_amount
-                          : historyForm.total_amount - Number(balanceNum);
+                      const balanceNum = val === "" ? 0 : parseFloat(val);
+                      const total = Number(historyForm.total_amount) || 0;
 
                       setHistoryForm({
                         ...historyForm,
-                        balance_amount: balanceNum,
-                        amount_paid: paid,
+                        balance_amount: val === "" ? "" : balanceNum,
+                        amount_paid: total - balanceNum,
                       });
                     }}
                   />
