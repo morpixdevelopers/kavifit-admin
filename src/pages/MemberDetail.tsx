@@ -1,4 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState ,useRef} from "react";
+
+
+
+
 import { supabase } from "../lib/supabase";
 import {
   ArrowLeft,
@@ -9,6 +13,7 @@ import {
   UserMinus,
   UserPlus,
   User,
+  Camera
 } from "lucide-react";
 
 interface Membership {
@@ -88,6 +93,8 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
       });
     }
   }, [member]);
+const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     if (historyForm.start_date && historyForm.no_of_months > 0) {
@@ -101,6 +108,37 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
       }
     }
   }, [historyForm.start_date, historyForm.no_of_months]);
+
+  const handlePhotoChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !member) return;
+  
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${member.id}.${fileExt}`;
+  
+    const { error: uploadError } = await supabase.storage
+      .from("member-photos")
+      .upload(fileName, file, {
+        upsert: true,
+      });
+  
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return;
+    }
+  
+    const { error: updateError } = await supabase
+      .from("members")
+      .update({ photo: fileName })
+      .eq("id", member.id);
+  
+    if (!updateError) {
+      fetchMember(); // refresh UI
+    }
+  };
+  
 
   const getPhotoUrl = (photo?: string | null) => {
     if (!photo) return undefined;
@@ -266,20 +304,36 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
           </div>
 
           <div className="bg-gradient-to-r from-orange-600 to-red-700 px-8 py-6">
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-16 h-16 rounded-full bg-white/20 overflow-hidden flex items-center justify-center border-2 border-white/30">
-                {member.photo ? (
-                  <img
-                    src={getPhotoUrl(member.photo)}
-                    alt={member.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="text-white" size={32} />
-                )}
-              </div>
-              <h1 className="text-4xl font-bold text-white">{member.name}</h1>
-            </div>
+       
+
+<div className="relative group w-16 h-16 rounded-full bg-white/20 overflow-hidden flex items-center justify-center border-2 border-white/30 cursor-pointer">
+  {member.photo ? (
+    <img
+      src={getPhotoUrl(member.photo)}
+      alt={member.name}
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <User className="text-white" size={32} />
+  )}
+
+  {/* Hover Overlay */}
+  <div
+    onClick={() => fileInputRef.current?.click()}
+    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+  >
+    <Camera className="text-white" size={20} />
+  </div>
+</div>
+
+<input
+  ref={fileInputRef}
+  type="file"
+  accept="image/*"
+  className="hidden"
+  onChange={handlePhotoChange}
+/>
+
 
             <div className="flex items-center space-x-4">
               <span className="text-yellow-200 text-lg">
