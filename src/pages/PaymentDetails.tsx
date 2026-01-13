@@ -11,6 +11,8 @@ import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export function Payments() {
@@ -19,6 +21,7 @@ export function Payments() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [loading, setLoading] = useState(true);
   const [listTab, setListTab] = useState<"pending" | "paid">("pending");
+  const [showAllTime, setShowAllTime] = useState(false);
 
   const [stats, setStats] = useState({
     newMembers: 0,
@@ -194,27 +197,50 @@ export function Payments() {
               <div className="flex items-center gap-2 text-slate-500 mb-1">
                 <Users className="h-4 w-4" />
                 <span className="text-[10px] uppercase font-black tracking-widest">
-                  Active Gym Members
+                  Active Members
                 </span>
               </div>
               <p className="text-2xl font-bold text-white">
                 {stats.totalGymMembers}
               </p>
             </div>
-            <div className="bg-slate-800 border border-slate-700 px-5 py-3 rounded-2xl shadow-lg border-b-2 border-b-green-500">
+
+            {/* FIXED TOTAL EARNINGS CARD - Removed shaking by adding w-[220px] and relative positioning */}
+            <div className="bg-slate-800 border border-slate-700 px-5 py-3 rounded-2xl shadow-lg border-b-2 border-b-green-500 min-w-[220px] relative">
               <div className="flex items-center gap-2 text-slate-500 mb-1">
                 <IndianRupee className="h-4 w-4" />
                 <span className="text-[10px] uppercase font-black tracking-widest">
                   Total Earnings
                 </span>
               </div>
-              <p className="text-2xl font-bold text-white">
-                ₹{stats.allTimeEarnings.toLocaleString()}
-              </p>
+
+              <div className="flex items-center h-8">
+                {showAllTime ? (
+                  <p className="text-2xl font-bold text-white">
+                    ₹{stats.allTimeEarnings.toLocaleString()}
+                  </p>
+                ) : (
+                  <p className="text-2xl font-bold text-slate-600 tracking-[0.2em]">
+                    ••••••
+                  </p>
+                )}
+
+                <button
+                  onClick={() => setShowAllTime(!showAllTime)}
+                  className="ml-auto p-1.5 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
+                >
+                  {showAllTime ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* DATE SELECTOR */}
         <div className="flex items-center bg-slate-800/50 border border-slate-700 p-2 rounded-2xl mb-10 w-fit">
           <button
             onClick={handlePrevMonth}
@@ -263,6 +289,7 @@ export function Payments() {
           </div>
         ) : (
           <>
+            {/* STAT CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
               <div className="bg-slate-800 p-8 rounded-3xl border border-slate-700 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
@@ -305,6 +332,7 @@ export function Payments() {
               </div>
             </div>
 
+            {/* TABS & LIST */}
             <div className="bg-slate-800 rounded-3xl border border-slate-700 overflow-hidden shadow-2xl mb-10">
               <div className="flex bg-slate-800/50">
                 <button
@@ -402,12 +430,6 @@ export function Payments() {
                       ))}
                     </tbody>
                   </table>
-                  {(listTab === "pending" ? pendingMembers : paidMembers)
-                    .length === 0 && (
-                    <div className="py-24 text-center text-slate-500 italic text-sm tracking-widest uppercase">
-                      No Records Found
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
