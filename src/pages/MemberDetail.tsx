@@ -328,7 +328,7 @@ export function MemberDetail({ memberId, onBack }: MemberDetailProps) {
 
             <div className="flex items-center space-x-4">
               <span className="text-yellow-200 text-lg">
-                ID: {member.member_no} | Admission No: {member.admin_no}
+                Admission No: {member.admin_no}
               </span>
 
               <span

@@ -299,12 +299,6 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                         <div className="space-y-1 text-sm">
                           <p className="text-gray-400">
                             <span className="text-orange-500 font-medium">
-                              ID:
-                            </span>{" "}
-                            {member.member_no}
-                          </p>
-                          <p className="text-gray-400">
-                            <span className="text-orange-500 font-medium">
                               Admission No:
                             </span>{" "}
                             {member.admin_no}
@@ -420,21 +414,13 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
             </div>
 
             <form onSubmit={handleRenew} className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 bg-slate-800 p-4 rounded-lg border border-slate-700 mb-4">
+              <div className="grid grid-cols-2 gap-3 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
                 <div>
                   <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
                     Member Name
                   </label>
                   <div className="text-white font-semibold truncate">
                     {selectedMemberForEdit.name}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
-                    Member ID
-                  </label>
-                  <div className="text-white font-semibold">
-                    {selectedMemberForEdit.member_no}
                   </div>
                 </div>
                 <div>
