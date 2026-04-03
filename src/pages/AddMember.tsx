@@ -63,6 +63,7 @@ export function AddMember() {
       }
     }
 
+    // Insert Member
     const { data: member, error: memberError } = await supabase
       .from("members")
       .insert({
@@ -78,6 +79,7 @@ export function AddMember() {
         alcoholic: alcoholic,
         smoking_habit: smokingHabit,
         teetotaler: teetotaler,
+        admin_no: Number(formData.get("admin_no")), // Ensured Number conversion
       })
       .select()
       .single();
@@ -85,12 +87,13 @@ export function AddMember() {
     if (memberError || !member) {
       setMessage({
         type: "error",
-        text: memberError?.message || "Failed to add member",
+        text: memberError?.message || "Failed to add member details",
       });
       setIsSubmitting(false);
       return;
     }
 
+    // Insert Membership
     const { error: membershipError } = await supabase
       .from("memberships")
       .insert({
@@ -101,13 +104,19 @@ export function AddMember() {
         end_date: end.toISOString().split("T")[0],
         total_amount: totalAmount,
         amount_paid: amountPaid,
-        payment_method: paymentMethod, // Added this field
+        payment_method: paymentMethod,
       });
 
     if (membershipError) {
-      setMessage({ type: "error", text: membershipError.message });
+      setMessage({
+        type: "error",
+        text: `Member added, but membership failed: ${membershipError.message}`,
+      });
     } else {
-      setMessage({ type: "success", text: "Member added successfully" });
+      setMessage({
+        type: "success",
+        text: "Member and Membership added successfully",
+      });
       (e.target as HTMLFormElement).reset();
       handleRemoveImage();
       setTotalAmount(0);
@@ -122,7 +131,7 @@ export function AddMember() {
   };
 
   const input = `w-full px-4 py-2 bg-[#334155] border border-[#2f4050] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#f97316] transition-all`;
-  const label = "block text-xs font-semibold text-slate-300 mb-1";
+  const labelClass = "block text-xs font-semibold text-slate-300 mb-1";
 
   return (
     <div className="bg-[#172033] min-h-screen py-10 px-4 text-white">
@@ -152,7 +161,7 @@ export function AddMember() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-3">
-                <label className={label}>Profile Photo</label>
+                <label className={labelClass}>Profile Photo</label>
                 <div className="flex items-center gap-6">
                   <div className="relative group w-28 h-28 rounded-xl border-2 border-dashed border-slate-600 flex items-center justify-center bg-[#0f172a] overflow-hidden">
                     {preview ? (
@@ -202,7 +211,7 @@ export function AddMember() {
                 </div>
               </div>
               <div>
-                <label className={label}>Full Name</label>
+                <label className={labelClass}>Full Name</label>
                 <input
                   name="name"
                   placeholder="e.g. John Doe"
@@ -211,7 +220,16 @@ export function AddMember() {
                 />
               </div>
               <div>
-                <label className={label}>Date of Joining</label>
+                <label className={labelClass}>Admission Number</label>
+                <input
+                  type="number"
+                  name="admin_no"
+                  required
+                  className={input}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Date of Joining</label>
                 <input
                   type="date"
                   name="date_of_joining"
@@ -220,19 +238,19 @@ export function AddMember() {
                 />
               </div>
               <div>
-                <label className={label}>Age</label>
+                <label className={labelClass}>Age</label>
                 <input type="number" name="age" required className={input} />
               </div>
               <div>
-                <label className={label}>Height (cm)</label>
+                <label className={labelClass}>Height (cm)</label>
                 <input type="number" name="height" required className={input} />
               </div>
               <div>
-                <label className={label}>Weight (kg)</label>
+                <label className={labelClass}>Weight (kg)</label>
                 <input type="number" name="weight" required className={input} />
               </div>
               <div>
-                <label className={label}>Blood Group</label>
+                <label className={labelClass}>Blood Group</label>
                 <select name="blood_group" required className={input}>
                   <option value="">Select</option>
                   <option>A+</option>
@@ -255,7 +273,7 @@ export function AddMember() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="relative">
-                <label className={label}>Phone Number</label>
+                <label className={labelClass}>Phone Number</label>
                 <input
                   type="text"
                   name="contact_number"
@@ -263,7 +281,7 @@ export function AddMember() {
                   value={contactNumber}
                   onChange={(e) =>
                     setContactNumber(
-                      e.target.value.replace(/\D/g, "").slice(0, 10)
+                      e.target.value.replace(/\D/g, "").slice(0, 10),
                     )
                   }
                   required
@@ -280,7 +298,7 @@ export function AddMember() {
                 )}
               </div>
               <div>
-                <label className={label}>Occupation</label>
+                <label className={labelClass}>Occupation</label>
                 <input
                   name="occupation"
                   placeholder="e.g. Shop owner, IT employee"
@@ -288,7 +306,7 @@ export function AddMember() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className={label}>Address</label>
+                <label className={labelClass}>Address</label>
                 <textarea
                   name="address"
                   rows={3}
@@ -350,7 +368,7 @@ export function AddMember() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className={label}>Duration</label>
+                <label className={labelClass}>Duration</label>
                 <select name="no_of_months" required className={input}>
                   <option value="">Select duration</option>
                   {[...Array(20)].map((_, i) => (
@@ -361,7 +379,7 @@ export function AddMember() {
                 </select>
               </div>
               <div>
-                <label className={label}>Package</label>
+                <label className={labelClass}>Package</label>
                 <select name="package" required className={input}>
                   <option value="">Select package</option>
                   <option>1 month</option>
@@ -376,7 +394,7 @@ export function AddMember() {
                 </select>
               </div>
               <div>
-                <label className={label}>Total Package Amount (₹)</label>
+                <label className={labelClass}>Total Package Amount (₹)</label>
                 <input
                   type="number"
                   value={totalAmount || ""}
@@ -386,7 +404,7 @@ export function AddMember() {
                 />
               </div>
               <div>
-                <label className={label}>Amount Paid Now (₹)</label>
+                <label className={labelClass}>Amount Paid Now (₹)</label>
                 <input
                   type="number"
                   value={amountPaid || ""}
@@ -399,7 +417,7 @@ export function AddMember() {
               {/* BALANCE AND PAYMENT METHOD ROW */}
               <div className="flex flex-col md:flex-row gap-6 md:col-span-2">
                 <div className="flex-1">
-                  <label className={label}>Balance Amount (₹)</label>
+                  <label className={labelClass}>Balance Amount (₹)</label>
                   <input
                     type="number"
                     readOnly
@@ -408,7 +426,7 @@ export function AddMember() {
                   />
                 </div>
                 <div className="flex-1">
-                  <label className={label}>Payment Method</label>
+                  <label className={labelClass}>Payment Method</label>
                   <div className="flex items-center h-[42px] gap-6 bg-[#334155]/30 px-4 rounded-lg border border-[#2f4050]">
                     <label className="flex items-center gap-2 cursor-pointer group">
                       <input

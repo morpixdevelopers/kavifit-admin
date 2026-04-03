@@ -32,6 +32,7 @@ interface Member {
   memberships: Membership[];
   is_inactive?: boolean;
   photo?: string | null;
+  admin_no: string;
 }
 
 interface ViewMembersProps {
@@ -66,7 +67,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
     if (formData.start_date && formData.no_of_months > 0) {
       const start = new Date(formData.start_date);
       const end = new Date(
-        start.setMonth(start.getMonth() + formData.no_of_months)
+        start.setMonth(start.getMonth() + formData.no_of_months),
       );
       setFormData((prev) => ({
         ...prev,
@@ -90,9 +91,9 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
       .from("members")
       .select(
         `
-        id, name, contact_number, member_no, created_at, is_inactive, photo,
+        id, name, contact_number, member_no, created_at, is_inactive, photo, admin_no,
         memberships ( id, package, start_date, end_date, amount_paid, total_amount )
-      `
+      `,
       )
       .order("created_at", { ascending: false });
 
@@ -154,7 +155,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
   const getDaysUntilDue = (endDate: string) => {
     return Math.ceil(
       (new Date(endDate).getTime() - new Date().getTime()) /
-        (1000 * 60 * 60 * 24)
+        (1000 * 60 * 60 * 24),
     );
   };
 
@@ -183,17 +184,18 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
     all: members.length,
     active: members.filter(
       (m) =>
-        !m.is_inactive && getMemberStatus(getLatest(m.memberships)) === "active"
+        !m.is_inactive &&
+        getMemberStatus(getLatest(m.memberships)) === "active",
     ).length,
     expiring: members.filter(
       (m) =>
         !m.is_inactive &&
-        getMemberStatus(getLatest(m.memberships)) === "expiring"
+        getMemberStatus(getLatest(m.memberships)) === "expiring",
     ).length,
     expired: members.filter(
       (m) =>
         !m.is_inactive &&
-        getMemberStatus(getLatest(m.memberships)) === "expired"
+        getMemberStatus(getLatest(m.memberships)) === "expired",
     ).length,
   };
 
@@ -228,17 +230,17 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                 ? f === "all"
                   ? "bg-gray-400 text-black"
                   : f === "active"
-                  ? "bg-green-500 text-white"
-                  : f === "expiring"
-                  ? "bg-yellow-500 text-black"
-                  : "bg-red-500 text-white"
+                    ? "bg-green-500 text-white"
+                    : f === "expiring"
+                      ? "bg-yellow-500 text-black"
+                      : "bg-red-500 text-white"
                 : f === "active"
-                ? "bg-green-900/30 text-green-300 border border-green-500/50"
-                : f === "expiring"
-                ? "bg-yellow-900/30 text-yellow-300 border border-yellow-500/50"
-                : f === "expired"
-                ? "bg-red-900/30 text-red-300 border border-red-500/50"
-                : "bg-gray-700 text-gray-300"
+                  ? "bg-green-900/30 text-green-300 border border-green-500/50"
+                  : f === "expiring"
+                    ? "bg-yellow-900/30 text-yellow-300 border border-yellow-500/50"
+                    : f === "expired"
+                      ? "bg-red-900/30 text-red-300 border border-red-500/50"
+                      : "bg-gray-700 text-gray-300"
             }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)} ({counts[f]})
@@ -303,6 +305,12 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                           </p>
                           <p className="text-gray-400">
                             <span className="text-orange-500 font-medium">
+                              Admission No:
+                            </span>{" "}
+                            {member.admin_no}
+                          </p>
+                          <p className="text-gray-400">
+                            <span className="text-orange-500 font-medium">
                               Package:
                             </span>{" "}
                             {latest?.package || "N/A"}
@@ -320,18 +328,18 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                               daysLeft === null
                                 ? "text-gray-300"
                                 : daysLeft < 0
-                                ? "text-red-500"
-                                : daysLeft <= 7
-                                ? "text-yellow-400"
-                                : "text-green-400"
+                                  ? "text-red-500"
+                                  : daysLeft <= 7
+                                    ? "text-yellow-400"
+                                    : "text-green-400"
                             }`}
                           >
                             <span className="text-gray-400">Expires:</span>{" "}
                             {daysLeft === null
                               ? "N/A"
                               : daysLeft < 0
-                              ? "Expired"
-                              : `${daysLeft} days left`}
+                                ? "Expired"
+                                : `${daysLeft} days left`}
                           </p>
                         </div>
                       </div>
@@ -367,7 +375,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                             ", we wanted to remind you that your gym membership is set to expire soon . Please contact us to renew and continue enjoying our facilities! \nThank you! \nKavifit Gym.";
                           const encoded = encodeURIComponent(message);
                           window.open(
-                            `https://wa.me/${member.contact_number}?text=${encoded}`
+                            `https://wa.me/${member.contact_number}?text=${encoded}`,
                           );
                         }}
                         className="p-2 text-green-400 hover:bg-green-900/20 rounded transition-colors"
@@ -412,7 +420,7 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
             </div>
 
             <form onSubmit={handleRenew} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
+              <div className="grid grid-cols-3 gap-4 bg-slate-800 p-4 rounded-lg border border-slate-700 mb-4">
                 <div>
                   <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
                     Member Name
@@ -423,10 +431,18 @@ export function ViewMembers({ onSelectMember }: ViewMembersProps) {
                 </div>
                 <div>
                   <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
-                    Admission No
+                    Member ID
                   </label>
                   <div className="text-white font-semibold">
                     {selectedMemberForEdit.member_no}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-orange-400 uppercase font-bold mb-1">
+                    Admission No
+                  </label>
+                  <div className="text-white font-semibold">
+                    {selectedMemberForEdit.admin_no}
                   </div>
                 </div>
               </div>
